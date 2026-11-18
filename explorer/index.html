@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Priority Explorer</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{--ink:#1c2430;--mute:#66707d;--line:#e3e6ea;--bg:#f6f7f9;--accent:#0b5cad;--accent-bg:#e8f1fb}
+*{box-sizing:border-box}html,body{height:100%;margin:0;font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink)}
+button,select,input{font:inherit;color:inherit}
+#app{display:flex;height:100%}
+#left{width:380px;min-width:300px;display:flex;flex-direction:column;border-right:1px solid var(--line);background:#fff;z-index:2}
+#mapwrap{flex:1;position:relative;min-width:0;overflow:hidden}#map{position:absolute;inset:0}
+#right{width:400px;max-width:92vw;display:flex;flex-direction:column;border-left:1px solid var(--line);background:#fff;z-index:2}
+#right.closed{display:none}
+header{padding:12px 16px 10px;background:#14253d;color:#fff}
+header h1{font-size:16px;margin:0;letter-spacing:.01em}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:9px}.brand img{height:30px;display:block}.brand i{width:1px;height:30px;background:rgba(255,255,255,.35)}
+.brand small{display:block;font-size:11px;color:#b8c6dc;font-weight:500;margin-top:1px}
+header select{width:100%;padding:6px 8px;border:0;border-radius:6px;background:#fff;color:var(--ink)}
+.sub{color:var(--mute);font-size:12px}
+.tabs{display:flex;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;padding:10px 6px;border:0;border-bottom:2px solid transparent;background:none;cursor:pointer;color:var(--mute);font-weight:600}
+.tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+.pane{flex:1;overflow:auto;padding:12px 16px;display:none;position:relative}.pane.on{display:block}
+h3{font-size:11px;margin:16px 0 6px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+h3:first-child{margin-top:2px}
+h2{font-size:17px;margin:6px 0 4px;line-height:1.25}
+.seg{display:flex;border:1px solid #cfd4da;border-radius:7px;overflow:hidden}
+.seg button{flex:1;padding:6px 4px;border:0;border-left:1px solid #cfd4da;background:#fff;cursor:pointer;font-size:12.5px}
+.seg button:first-child{border-left:0}.seg.g2{display:grid;grid-template-columns:1fr 1fr}.seg.g2 button{padding:7px 4px}.seg.g2 button:nth-child(odd){border-left:0}.seg.g2 button:nth-child(n+3){border-top:1px solid #cfd4da}.seg button.on{background:var(--accent);color:#fff}
+select.full,input.full{width:100%;padding:7px 9px;border:1px solid #cfd4da;border-radius:7px;background:#fff;margin-top:6px}
+.legend{display:flex;gap:4px}.legend button{flex:1;border:0;background:none;padding:0;cursor:pointer;font-size:10.5px;color:var(--mute);text-align:center}
+.legend i{display:block;height:10px;border-radius:3px;margin-bottom:3px}.legend button.off{opacity:.3}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tile{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.tile b{display:block;font-size:17px}.tile span{font-size:11.5px;color:var(--mute)}
+.chk{display:flex;flex-wrap:wrap;gap:6px 14px}.chk label{display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.fchip{padding:4px 10px;border:1px solid #cfd4da;border-radius:14px;background:#fff;cursor:pointer;font-size:12.5px}
+.fchip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.rad{display:flex;align-items:center;gap:10px;margin:8px 0}.rad span{font-size:12px;color:var(--mute)}.rad input{flex:1;accent-color:var(--accent)}.rad b{min-width:58px;text-align:right}
+.pinfo{margin-top:8px;background:var(--bg);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:6px;padding:8px 10px;font-size:12.5px;line-height:1.45;color:#39424e}.pinfo b{color:var(--ink)}
+.row2{display:flex;gap:8px}.row2>*{flex:1;min-width:0}
+.count{display:flex;justify-content:space-between;align-items:center;margin:10px 0 4px;font-size:12.5px;color:var(--mute)}
+.link{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font-size:12.5px}
+.scopebar{background:var(--accent-bg);border:1px solid #c9dcf3;border-radius:8px;padding:6px 10px;font-size:12.5px;margin-top:8px;display:flex;justify-content:space-between;gap:8px}
+.prow{display:flex;gap:8px;padding:8px 2px;border-bottom:1px solid var(--line);cursor:pointer}
+.prow:hover{background:var(--bg)}.prow.sel{background:var(--accent-bg)}
+.prow b{font-weight:600;display:block;line-height:1.3}.prow small{display:block;color:var(--mute);font-size:12px;margin-top:2px}
+.dot{flex:0 0 10px;width:10px;height:10px;border-radius:5px;margin-top:5px}
+code{font:11px Menlo,Consolas,monospace;background:#eef1f5;color:#2b3440;padding:1px 6px;border-radius:4px;white-space:nowrap}
+.chip{display:inline-block;padding:2px 9px;border-radius:11px;font-size:12px;font-weight:600;white-space:nowrap}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}
+.card{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.card>span{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.05em}
+.card .big{font-size:17px;font-weight:700;margin-top:4px}.card small{display:block;color:var(--mute);font-size:12px;margin-top:4px}
+.steps{display:flex;gap:3px;margin-top:7px}.steps i{flex:1;height:7px;border-radius:4px}
+.bar{height:7px;background:#e6e8ec;border-radius:4px;margin-top:6px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}
+table.kv{width:100%;border-collapse:collapse;margin:6px 0}table.kv td{padding:3px 0;vertical-align:top}table.kv td:first-child{width:96px;color:var(--mute);font-size:12px}
+table.nt{width:100%;border-collapse:collapse}table.nt td{padding:4px 0;border-bottom:1px solid var(--line)}table.nt td:last-child{text-align:right}
+.note{background:#fff8e5;border:1px solid #f1dfa9;border-radius:8px;padding:8px 10px;font-size:12.5px;margin:10px 0}
+.dim{color:var(--mute)}a{color:var(--accent)}
+#rhead{display:flex;align-items:center;gap:6px;padding:8px 10px 0 16px}
+#rtabs{flex:1;display:flex;gap:6px;flex-wrap:wrap}
+#rtabs button{padding:5px 11px;border:1px solid #cfd4da;border-radius:14px;background:#fff;cursor:pointer;font-size:12.5px}
+#rtabs button.on{background:#14253d;border-color:#14253d;color:#fff}
+#rclose{border:0;background:none;font-size:22px;line-height:1;cursor:pointer;color:var(--mute);padding:4px 8px}
+#rbody{flex:1;overflow:auto;padding:8px 16px 20px;position:relative}
+.btn{padding:5px 12px;border:1px solid #cfd4da;border-radius:7px;background:#fff;cursor:pointer;font-size:12.5px}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+#tools{position:absolute;z-index:450;left:10px;top:84px;display:flex;flex-direction:column;gap:6px}#tools .btn{box-shadow:0 1px 5px rgba(0,0,0,.25);border:0;padding:7px 12px;text-align:left}#tools .btn.on{background:#14253d;color:#fff}
+#tip{position:absolute;z-index:500;pointer-events:none;background:#14253d;color:#fff;padding:4px 8px;border-radius:6px;font-size:12px;display:none;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hint{position:absolute;z-index:450;left:50%;transform:translateX(-50%);bottom:26px;background:rgba(20,37,61,.92);color:#fff;padding:7px 14px;border-radius:18px;font-size:12.5px;pointer-events:none}
+#mapleg{position:absolute;z-index:450;left:10px;bottom:26px;background:#fff;border-radius:8px;padding:7px 10px;font-size:11.5px;box-shadow:0 1px 5px rgba(0,0,0,.25);max-width:250px}
+#mapleg b{display:block;margin-bottom:4px}#mapleg span{display:inline-flex;align-items:center;gap:4px;margin-right:8px;white-space:nowrap}#mapleg i{display:inline-block;width:14px;height:4px;border-radius:2px}
+#spots{position:fixed;inset:0;pointer-events:none;z-index:3000}
+.spot{position:fixed;border:3px solid #e04e1b;border-radius:10px;box-shadow:0 0 0 4000px rgba(10,20,40,.28),0 0 18px rgba(224,78,27,.7);animation:spotin .45s ease both}
+.spot.k1{box-shadow:0 0 18px rgba(224,78,27,.7)}
+.spot b{position:absolute;background:#e04e1b;color:#fff;font-size:15px;font-weight:600;line-height:1.3;padding:8px 12px;border-radius:8px;width:max-content;max-width:330px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+@keyframes spotin{from{opacity:0;transform:scale(1.06)}}
+#loading{position:absolute;inset:0;z-index:600;background:rgba(255,255,255,.75);display:none;align-items:center;justify-content:center;font-weight:600}
+@media(max-width:900px){#app{flex-direction:column}#left{width:100%;height:42%;border-right:0;order:2}#mapwrap{order:1}#right{position:absolute;right:0;top:0;bottom:0;box-shadow:-4px 0 14px rgba(0,0,0,.2)}}
+</style></head><body>
+<div id="spots"></div>
+<div id="app">
+<aside id="left">
+  <header><div class="brand"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAABACAYAAAAkn/rnAAATc0lEQVR42u2dd5xdVbXHv2vfOyWN0ASpQohS9FGkRhANgiA8RFFQ8CE8BUGQpoBIIikQihQpgiDlPUDpKg8UBKUGRKVICSChBAwGQooJSRhm5p7984+z5nk/88nMPTecmcmdnN/ncz8zc2fXtffaZe1VICM6Ojq2lzRF0iOS3ta/sVjSU5Iu7Ojo2JkCBQosP5C0i6S7JLWpNtol/UbSmIJyBQoMLOOuLOkSSRXVjzZJp0lqKihZoED/M+/GSZI8rvePX8+dO3elgqIFCvQf835U0svKCUmS3ClpeEHZAgXyh3Vj3tHAXcDonOu5CjjMzFTHQvIfwDFArJG0HZhoZvMHYLHbC/h8Dfo+YGbXe/pNgeP6q30xxvYQwivAAuAlYCbwpplV+pAmqwBbAJsCo4Dl4QQ2C3ito6Pj6ebm5mlL67+kIcBEYOVG3XlHSPqT+g6HLUN7nslY9pQBoleWk8qYqjx7aGCxUNJfkyT5qaQvSFotR3qs5HKP17X8olPSY5IO7EHmM18NhuoO/LgvK0qSZI6k9eucFLtmFKItlPThfmbg72Zo1+Xd8uy2nI3/G5IulrR5DgLPBxps7p/WrQ8jJf2jIRlY0if8CUh9zMRXLMPkuClj8df0I/Ou4ZO/N8yT9KHlnIG7sETSZZLWW0Z6nKfGQ5S0W6MzcJBUijFOApr7euKHEA6StF2d2X4ILMyQ7kBJO/YTD38HWKdGmovN7PUGuUENBQ4HHpG0X53M+0Hg4AaV/xzT6EKsAOweQti1n+priTGeIamUmcpm04GLMiQtA5PrKXsZd5v1gSNrJHs9Y5uXN6wH3ChpfB15tgVWa9D5v32ecoCBQNlXoReBx4FZSZIsMbM1Qwgbxxi3DiGMzHkX/gywP3BDHdkuAP4L2LBGul2ALwE39yHNTswwYc8YCKl4jov6aZKCmU3OkH6rBp7/qwEbAfN8Rx7ScMcISdsCz5rZe0vZbTYADgSOBj6YY70vAtuZ2Tt17HwHAddmSPq8l72kD3bfTXyhG9ZLsqeAMT3QczfgnhrVzPXnjM4cmryKP+ds7j9b68x/mJldWYMmF/n86A23AH8YgPl9PLBJjTS7m9k9kpp9Yxn6Pusc7uM3opc0S4AJwKL+EtpsIOn2nO/f4+psQ0nS/RnL/l4f0eG6WoKRzs7OfXrJn0WI9UoftLskaVNJ4yW9VscYLZD0sRpl35qhnKMYmKfRezK07YCc6xwmaXaNOudKGpHXcSnLPfQ1YF/g0hz7+j1Jo+q4CyfA+Iw700kuXMlzYLb3Fbo33Fsul+/I4VSU61HOzBIze8HMTge2Ay7JmHUk8CNJ1kuaYRnKaWZgkEUeMiLnOod0V5DqQYA2pN8Y2CdBxY9Kl+XU0VVIJcz1TMRHgJ9nSLoGcHLOAzO+xkTsAE41s8hyDDN728y+48fLLJpxu7tsoce1DRpekLtiNN4n53HAfTnV/7WOjo6d6swz0e+JNe9vro6Zx+67K/C5Wvc8M3u0YYQfZhcAZ2WcI9+hwOBYfcysHTgMmJ1D/U1NTU1n1mN2aGZ/B87NkHRojHFiDsxbBk7t7TgWY1wEnNaA4z+ZVOhWC7vUq0VXYDk+PpjZq36kzAM7JUny1TrzXAr8LcOT1ReqtW2WEZ8HPlkjzeVm9mKjDb5LyrMshisBnyrYZXCd/6+JMf4xF0lDqTTBrViyTrxFwLiM/ZvsTwTLsvu21lqoYoxvhhDObeA58FtSa51aKNwlDSYGNrPOEMLknIQYGwHfresiPHHibcCdGZLuAHxtWe/o1FBUkHSumc1u1AlgZguALHf3j0kKBcsMLgnc78nvgf6YeiyKJk2aFEml2O9lSD5O0sr1mgtSW5L9QqlU+tkgmAdZ7sFrk+3JqECjMLBLpU/JyERZ7lkT66z/SeDKjDt8vYrrh1PbscFpZrZ4EMyDF8imdrhqwTKD7A3MzB4Hrs6pPV+RtEudeaYAb2ZId5yrhmYyF8xwpJ8K3DpI5kFHxrlSHKEH6SP2mTHGOTmUU3JrpeY6FpC3gDPIpjhyStbjPLBWL/9PgElm1jlI5kGlYIUVmIHN7I0Qwlk5WSttT2p5RJ0+t57MkO7gWvbIbW1tGwDfrlHObWZ27yCaB+WCFQo1ssuAZ3Iqa4Kk1etYQNp8d40ZdHIn9iZNbW1tPbHGXa+to6Pj9EE2D7Io0qhgl0HMwGb2LqnGUh5YHzihzvrvjjHeliHp54C9e7j7bgYcUiP/1S0tLU8NsnmwcYY0/wTmFywzuBW5bydVDMgDR7kb1nqO3z8EskiFJ/Zg8TOO3u1B5wI/GoTzYIsMad7KSNsCjcrA7vd5HPBuDsUNp079YjN7HvhJhqRbAt/otvvuANTyB3WB62IziBz5jwCyxLKa5iadBQazKZWZPU22t9ks+KKkPerMcy7wGrWdnp+yaNGiNXwSG6lSSG93wVfJ1x56ecHufmWphYcLdllxbCHPJJt+bVb/TC11LCDzsuzcIYS1hw4d2uW5Yzeg1kIxxcz+Och23xbg+xkWuzbggYJdVhAG9rfZvKIlbAN8s8481wGPZEh3pLuMObkGLZ4Arh+E4z/R6VsLj/oJpMAK5I3gauCvOZU1TtKa9RhaAD+ghvudEMJw4Nf0bi6oSqUyYWlO6hp89z01q9eSEMLly7unkYKB+8bWdFxO74drAyfVWf/UGONNGZKOpndFhrvL5fJdgyl0rKQbgUlkN3S4vWCVFdAfkJndBfwqp+KOqDeGTwhhIun7Je9DR3gg/FwleUuaOzs7x3qspj8DX8ma1fv/fk8fA7V7Z9k8OgsVut4xgVRANCyH8B9TJH0+a5hSM3tF0nnA6csYnvOGUqn0GP3vSXENSe8tI41WI/X/PDpJklFmtiWwRblc3nAZyrvGzO7IoOBRCyPq0azLEVl06hcUDNw7Ez0n6afUqVnVA/byz2/qyHMR8HXgI3XW9U4IYSD8XK3jx1Yt44Qd3nWyKpXeV5SZJ4As/rWzWIKdDBw7ALQcWTBwPjib1Kfy+jkEpDpd0n2uupnJ/Y6kCdQXygXgEjN7hYHxZTzQ8XpeAb6aMTxMFgYetpw6A+jo6Oh4u7gD12aiueTntXELUmP7enALqfeQrEfnWcCPV1C5yJPAXmb2csb0jzVwX2c1Nze/WjAwmd9m/5JTWd+XtFadUR1OAdozCr/OMrM5KyDz/hzYo04Pm08CLzdof+/qixhag5KB3Z/0D8jHeHxNsnml7O455JqMwdGuWsEYdxpwoJkdVO/CZWaLkyQ5qwH7/E/SqJcUDJx9sO8jJzc0McZDJW1TZ7bTgFp3nolZ79cNjoXA70idJ4wxsxtYdrfAV7ukv1GMHeYAX/fY0wWoX5FgYU4RDu+q19WppGN7Ke/BvgwQLmkP9T/aJM2R9LykuyWdI+nLkj7UB/0bK+kXHgGxXcsXFkmaJumctra20X04xh/wunrDu/VoFtaS6g4EE59GPpEdBOyT4a2yuu4hwFdZuuXRVDN7oQ/7vS6wZx+S9r0kSdpKpdI8oM0VKBaS2jEv8mtMv5godnR0fKi5uXkEsDqpVL3fIxQ6Ld4C3vGT16y+poEHA9if3mMxtwM3uyeZhtyFV5H0Sk4r69OSCn/FBQr0MxMfkuPxaHJB0QIF+peBmyRNzYmB31sGf9IFChTg/anBfFJSR05M/LqkUQVVCxTo35342hyP0s9K2rCgaoEC/cfAoyTNz5GJX5S0U0HZAgX6j4nH5/zmt1jSRI9xVKBAgT5m4JFJkryU98t9kiRvSLpQ0p6SNpK0un82l7Tf/PnzRy6lLVtKWr/q77UkbSZpr0qlcnLG/hwq6ZAe/jc8SZJza4VSlbSOpDGSdpY0epCO+76SHpa0t/89zPu7Y1XfRzVIX3ZeoV9DJB3Qx5o4i10jaU6SJBXXuiovpR03Svp91d+3SLpC0u6STsrYl29KOrgnBpZ0dgYGnuBt/rOkmd6OlXOm+XmSxuRc5pmSPp0x7XRJk7qM/SWNlvSopDf8ZeEvkg4fwDm5nXsx6en/H5Z0hf++k6RJrKhBrW655Zab99tvv0OBvnoO+n+b1BACwDlmtjTDimuBm13V7V1Sh3cHuN74EkkfAI7yv18FniU1WJ/pmmHXAouAKGlj4DBSty0fAS4k9fDYBrQ58xxFqqV0vZnd1i1e0bNmNkbSlsD9wIlu23wCsC2p08CzSUPFbAhs6vnGkyrrTwHWBZ4j1VX+HKlN9qZAR4zxiBDCx10zbltSQ5MxSZLcWSqV1gU+BpxuZs9UKpVvl0qlXYHppP60dgV2IDWaX400rM4epJEdd5R0upnd07WzAicCm5MaTpwNHEHqvGBrUp9nc92EcYykU2KMB5dKpe0kfUvSCcAmwPnAkaSRI58gjZLxRWADYDNv/8mkTg3GkUakvIhUG2xrzxeAyWY2w09JezutzvQx/D5pvOv1vL3bS3qD1EnjBO/rg8AdpH7Cd5b0Dqle+ZIuxnc6NAP/Y2Z3+eLfDHwU+AcwIQ9LqOUm3uv++++f+MTr6Ifq7gN6clT3kDPgWI9Y0PHAAw9MdUY+CBgBTIgxbkLq+/pG0rAj00ljCm9I6jVkD5+g30uSZA4wL8b4E2Bl4GhnJAE3A38CLpW0Wg9GIE8Bv3Am+xpwIKnz/C/779vEGE8F7iYNZn4hqWOAx0gtq75J6vt6qxjjWd7ue0IIc4E/+kJ0vDP2c6VS6SrSOEgj3XRz91KpdJKXtaOn3dKZ5WFnoAm+OL1Najb6UlUXzvC2Xk3qSP68zs7Oh2OMS5wRZ/fiz+o/SU1Bn3cGfYTUquxYX0DG+IJ2B/BZUu8rx/tGcJm34zP+3d2+kJ4jaR/gvEql0mXE8Utn+ON9cZpKaio5zxdPJUlyn4/DeGCUfz+fNJzQZsChktaNMd5OamJ5d4zxeklbkUb9OMDrORzYh0azRqK2tdKjpHbDfYn3gB/0FCbEzBbHGH8LfCXGeABwz9ixYyuuV/yeT6yFIYQTfTdZBzjPzC4D/u765R3+MWB2uVw+H7g5hLAqMMR3dgGjYowHOuMMb29vX7UXp2xrkOrQ7uwr+X/7zr4RYCGER83sFuByYJvOzs7RvuPu7m1ZB1AI4XEzO93M7iSNdTTVzF4DKpVK5SZSD5RvAZcAj/upZUff2Q/2n+v7AvGwmd3kTPwBM3vCda//aGYzfDcqkep/X21mvwEujDHu2dTU9HQIYTHwiJnNrjFmvzKz84HhMcYvOHN29SkCD5nZr5zp1iN13pD4ArOmp7nHzG52pt7Ed+4Hm5qabvUTwWhfiNqAM5yWzwDvmNnDwPqlUmlfp3+nfx4GFruV3WL/bBlCaAXONrOrQggzvb3tvhvf6ovKWoOOgR2TXfm+rzDFzP5Sw6D/et9B9+ffrniCXzmC7wTRB1HA3pI+HWNc0ydOyT8GmFtMtVTROzhjTAkh/JbUxLKlpaXFuhmaDPN71rHAl4CfJ0nyuh/5TvWV/Eqva4MlS5asE2McC7zW1NT0DT/unQNUkiRp9XoTgPvvv78MlJMkGS1pqJfR5O2suOPAVv9+Zoyx3Y/kh5N6K2mtcpBQ3bcyMLoqeFz03egTfv3YE5jh3zezdCOHUHW9K1XNh3EhBLW1tZ1fVVepG81a/Yj7WV/0vgu0xRg3k7R2jHFHUj9Yz8UYPy5pHeBTvqjO87pjVfkjJK3iTL7Q+x5IHQgasLL3q8n7MjPG2Ars4NEuN3CGba4qt4nBGtjZzP4u6eQc4ytV4zYfCDJEIng8hGB+xMQn0eu+8r8EyMzm+P3sEOD5EMISIMQY3wwhVDo7O99tamrq8laxxCdyJ6nPqXl+fD4G+Bupu9fqU8GsGGNrCOG6GGMSQjjSzG7yu/nWwM98Ih0NtMcYVx06dOitwBqVSuWIcrmc+FH6YmBGqVR61yfQTICxY8dWJP1vqVQ6IUkSSqXSs5KW+A70siRLkuTtUqm08qxZs36x9tpr7wz81BesyUmSzCqVSl3PdLP93okfMY/0/l1lZmpvbz+xubn5UuBeYEkI4VtAEmN8xXfh7pgXQujyR/ZGFQPfCEwYMmTI+VW0nF1lVTeL1Na365qR+LF9L3fi/8sQQpcM46EQwlZ+rI7+3UxfXLqshB4E3okxXhdCuIE08Pu5wKuVSqVULpef9evHrT6WrwHPhBDGxxgvCSEIuAK4kzSYXpcHzxmDPlSrpItylkJPlTSynrhB06dPb+mmu90qySQN8YBoSNrepZUHu9T4o5Ka/VPq2om6fq/KH/z7NSSVPX3oVt/wHsKgdj1vreK/Xyzp9wsWLFhF0krVz3OSVpIUvPymGTNmtC7FfnW4963kaYcATJs2rdnN47rSfrDrnu7ta/Hfm6vjV3mZw7rVU/L85a6Ack6HUg968l10a5HU1M2Sbbi3s6m67unTp7dUfbdWVxskXSnp/zzvSt3qWlPS8G5tqh6HoV36BJJW9aeuclebvH1rep2t3dq5etXfrVV5Wqv7NFgZuJwkyaU5vQf/rq+UOiSdIOl+SQ9J+sYA0eo4SRdQoCf6nCTp7IISA0P8o9+HqmWU9JPCXrhAgYFl4k3d6GFBxh13saR7Je1VUK/AYIY1GCNvliTJvma2awhhI9JnBHMJ4j/8rfAB4A9mNq0Y3gKDHf8Clgi73bMLkJQAAAAASUVORK5CYII=" alt="VDOT"><i></i><div><h1>Priority Explorer</h1><small>2025 VTrans Prioritized Mid-term Needs</small></div></div><select id="dist" aria-label="District"></select></header>
+  <div class="tabs" id="ltabs"><button data-t="pri" class="on">Priorities</button><button data-t="proj">Projects <span id="ptabn"></span></button></div>
+  <div class="pane on" id="pane-pri">
+    <h3>Priority type</h3>
+    <select id="ptype" class="full" style="margin-top:0"></select>
+    <div id="pinfo" class="pinfo"></div>
+    <h3>Show from (click a colour)</h3>
+    <div class="legend" id="legend"></div>
+    <h3>Project coverage (gaps)</h3>
+    <div class="seg g2" id="gseg"><button data-g="all" class="on">All roads</button><button data-g="none">No project yet</button><button data-g="any">Has a project</button><button data-g="past">Has a past project</button></div>
+    <h3>Roads shown</h3>
+    <div class="tiles" id="tiles"></div>
+    <h3>Map layers</h3>
+    <div class="chk"><label><input type="checkbox" id="lyRoads" checked>Priority roads</label><label><input type="checkbox" id="lyProj" checked>Projects and studies</label></div>
+    <h3>Basemap</h3>
+    <div class="seg" id="bseg"><button data-b="light" class="on">Light</button><button data-b="dark">Dark</button><button data-b="sat">Satellite</button></div>
+    <p class="sub" style="margin-top:16px">Click any road, project or place on the map. The panel on the right shows its priorities and needs, and the <b>Projects</b> tab lists the projects there.</p>
+    <p class="sub" id="meta"></p>
+  </div>
+  <div class="pane" id="pane-proj">
+    <input id="q" class="full" style="margin-top:0" type="search" placeholder="Search name, project ID or UPC">
+    <h3>Where</h3>
+    <div class="seg" id="sseg"><button data-s="all" class="on">Everywhere</button><button data-s="view">In map view</button><button data-s="sel">At selection</button></div>
+    <div id="scopebar"></div>
+    <h3>Filters</h3>
+    <div class="chips" id="chips"></div>
+    <div id="netbox"><h3>Network-wide projects <span id="netn"></span></h3>
+    <div class="seg" id="nseg"><button data-n="hide" class="on">Hide</button><button data-n="show">Include</button><button data-n="only">Only these</button></div></div>
+    <h3>Type and cost</h3>
+    <div class="row2" style="margin-top:-6px"><select id="fmode" class="full"></select><select id="fcost" class="full"></select></div>
+    <div class="count"><span id="cnt"></span><span><button class="link" id="clr">Clear filters</button> &nbsp; <button class="link" id="csv">Download CSV</button></span></div>
+    <select id="sort" class="full" style="margin:0 0 4px"><option value="name">Sort: name</option><option value="cost">Sort: cost, high to low</option><option value="pri">Sort: district priority</option><option value="fy">Sort: year, newest first</option></select>
+    <div id="plist"></div>
+  </div>
+</aside>
+<div id="mapwrap"><div id="map"></div><div id="tools"><button id="circbtn" class="btn" title="Click anywhere to summarise a circle around it">Circle</button><button id="drawbtn" class="btn" title="Draw your own area to summarise">Draw area</button></div><div id="tip"></div><div id="mapleg"></div><div id="hint">Click a road, a project or anywhere on the map</div><div id="loading">Loading ...</div></div>
+<aside id="right" class="closed"><div id="rhead"><div id="rtabs"></div><button id="rclose" title="Close">&times;</button></div><div id="rbody"></div></aside>
+</div>
+<script>
+const META={"aoi":"output","generated":"2026-11-18 13:05","districts":[{"name":"Bristol","file":"bristol.js","b":[-83.6558,36.5672,-80.7951,37.4291],"np":486,"ns":11284},{"name":"Culpeper","file":"culpeper.js","b":[-78.8342,37.7335,-77.5613,39.015],"np":389,"ns":10812},{"name":"Fredericksburg","file":"fredericksburg.js","b":[-77.9255,37.2439,-76.2929,38.5271],"np":464,"ns":10391},{"name":"Hampton Roads","file":"hampton_roads.js","b":[-77.7085,36.5441,-75.3738,38.0015],"np":826,"ns":35457},{"name":"Lynchburg","file":"lynchburg.js","b":[-79.7116,36.537,-78.0998,38.0442],"np":360,"ns":13009},{"name":"Northern Virginia","file":"northern_virginia.js","b":[-77.9618,38.5202,-77.0386,39.3213],"np":686,"ns":41134},{"name":"Richmond","file":"richmond.js","b":[-78.7086,36.5439,-76.8075,37.9691],"np":931,"ns":34998},{"name":"Salem","file":"salem.js","b":[-80.9553,36.5427,-79.21,37.7952],"np":561,"ns":21368},{"name":"Staunton","file":"staunton.js","b":[-80.2245,37.5592,-77.8458,39.4409],"np":575,"ns":18035}],"start":"Hampton Roads","cats":[{"code":"COSS_CONG","label":"Congestion (CoSS)"},{"code":"COSS_REL","label":"Reliability (CoSS)"},{"code":"COSS_RAIL","label":"Rail Reliability (CoSS)"},{"code":"COSS_CAP","label":"Capacity Preservation (CoSS)"},{"code":"COSS_TDM","label":"TDM (CoSS)"},{"code":"RN_CONG","label":"Congestion (RN)"},{"code":"RN_REL","label":"Reliability (RN)"},{"code":"RN_CAP","label":"Capacity Preservation (RN)"},{"code":"RN_TDM","label":"TDM (RN)"},{"code":"RN_TREQ","label":"Transit Equity (RN)"},{"code":"RN_TRAN","label":"Transit Access (RN)"},{"code":"RN_BIKE","label":"Bicycle Access (RN)"},{"code":"RN_PED","label":"Pedestrian Access (RN)"},{"code":"IEDA","label":"Industrial & Economic Dev. Area"},{"code":"SAF_DIST","label":"Safety - Segments (District)"},{"code":"SAF_STATE","label":"Safety - Segments (Statewide)"},{"code":"SAF_PED","label":"Safety - Pedestrian"}],"levelTxt":["No Need","Low","Medium","High","Very High"],"rankTxt":["No Priority","Priority 4","Priority 3","Priority 2","Priority 1"],"high":3,"modes":["Bike / Ped","Bridge","Highway","Multimodal","Operations / ITS","Other","Rail","Safety","Study / PE","TDM / Park & Ride","Transit"],"costs":["Under $1M","$1M - $5M","$5M - $25M","$25M and over","Not given"]};
+window.PRIORITY_DATA={};
+const M=META,COL=['#c9ced6','#f3d36b','#f39c4a','#e2572b','#9b1124'],TXT=['#39424e','#3d3000','#3d1d00','#fff','#fff'];
+const GRP={'Completed':'#2e7d32','Study Complete':'#2e7d32','Under Construction':'#1565c0','Planned':'#6a1b9a','Funded Application':'#00838f','Unfunded Application':'#8d6e63','Study Ongoing':'#546e7a','Study':'#546e7a','Canceled':'#9e9e9e','Other':'#9e9e9e'};
+const CHIPS=[['past','Past projects'],['dp','District priority 1-2'],['sp','Statewide priority 1-2'],['syip','SYIP'],['ss','SMART SCALE'],['stars','STARS'],['pipe','Project Pipeline'],['study','Studies'],['bp','Bike / Ped'],['tr','Transit'],['funded','Hide unfunded']];
+const SRC={syip:p=>p.s==='SYIP',ss:p=>p.s==='SMART SCALE',stars:p=>p.s==='STARS'||p.og.includes('STARS'),pipe:p=>p.og.includes('Project Pipeline')||p.pg==='Project Pipeline',study:p=>p.s!=='SYIP'&&p.s!=='SMART SCALE'};
+const miTxt=ft=>String(Math.round(ft/52.8)/100)+' mi';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dec=p=>{const a=[];for(let i=0;i<p.length;i+=2)a.push([p[i]/1e5,p[i+1]/1e5]);return a};
+const money=v=>v==null?'Not given':v>=1e9?'$'+(v/1e9).toFixed(2)+'B':v>=1e6?'$'+(v/1e6).toFixed(1)+'M':v>=1e3?'$'+Math.round(v/1e3)+'K':'$'+Math.round(v);
+const num=(v,d=0)=>Number(v).toLocaleString(undefined,{maximumFractionDigits:d});
+const chip=(v,t)=>`<span class="chip" style="background:${COL[v]};color:${TXT[v]}">${esc(t)}</span>`;
+const stchip=g=>`<span class="chip" style="background:${GRP[g]||'#9e9e9e'};color:#fff">${esc(g)}</span>`;
+const steps=v=>`<div class="steps">${[1,2,3,4].map(k=>`<i style="background:${k<=v?COL[v]:'#e6e8ec'}"></i>`).join('')}</div>`;
+const pcard=(t,v)=>`<div class="card"><span>${t}</span><div style="margin-top:6px">${chip(v,M.rankTxt[v])}</div>${steps(v)}</div>`;
+
+// ---------- map
+const map=L.map('map',{preferCanvas:true,zoomSnap:.5});
+const esri=(svc,o)=>L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/'+svc+'/MapServer/tile/{z}/{y}/{x}',Object.assign({maxZoom:19,attribution:'Basemap &copy; Esri and its data providers'},o));
+const BASE={light:L.layerGroup([esri('Canvas/World_Light_Gray_Base',{maxNativeZoom:16}),esri('Canvas/World_Light_Gray_Reference',{maxNativeZoom:16})]),
+  dark:L.layerGroup([esri('Canvas/World_Dark_Gray_Base',{maxNativeZoom:16}),esri('Canvas/World_Dark_Gray_Reference',{maxNativeZoom:16})]),
+  sat:L.layerGroup([esri('World_Imagery',{}),esri('Reference/World_Boundaries_and_Places',{})])};
+let base='light';BASE.light.addTo(map);
+L.control.scale({metric:false,imperial:true}).addTo(map);
+[['proj',395],['road',405],['hi',420]].forEach(([n,z])=>{map.createPane(n).style.zIndex=z});
+map.getPane('hi').style.pointerEvents='none';
+const rP=L.canvas({pane:'proj',padding:.3}),rN=L.canvas({pane:'road',padding:.3}),rH=L.svg({pane:'hi',padding:.3});
+const gP=L.layerGroup().addTo(map),gN=L.layerGroup().addTo(map),gH=L.layerGroup().addTo(map),gHov=L.layerGroup().addTo(map);
+
+// ---------- state
+let D=null,segs=[],projects=[],idxS=null,idxP=null,selCircle=null;
+let metric='di',minLv=1,gap='all',scope='all',radiusFt=1320,sel=null,rtab=null,curProj=null,selSet=null,selLabel='',listMax=150;
+const Fl={q:'',chips:new Set(),mode:'',cost:'',sort:'name',net:'hide'};
+
+// ---------- geometry (local metres) + grid index
+const KY=111320,CELL=.01;
+const toXY=(lat,lng,lat0)=>[lng*KY*Math.cos(lat0*Math.PI/180),lat*KY];
+function dPtSeg(p,a,b){const dx=b[0]-a[0],dy=b[1]-a[1],l=dx*dx+dy*dy;let t=l?((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)}
+function distTo(parts,ll){const p=toXY(ll.lat,ll.lng,ll.lat);let m=Infinity;for(const part of parts){let a=toXY(part[0][0],part[0][1],ll.lat);if(part.length===1)m=Math.min(m,Math.hypot(p[0]-a[0],p[1]-a[1]));
+  for(let i=1;i<part.length;i++){const b=toXY(part[i][0],part[i][1],ll.lat);const d=dPtSeg(p,a,b);if(d<m)m=d;a=b}}return m}
+function inside(rings,ll){let c=false;for(const r of rings){for(let i=0,j=r.length-1;i<r.length;j=i++){const a=r[i],b=r[j];
+  if((a[0]>ll.lat)!==(b[0]>ll.lat)&&ll.lng<(b[1]-a[1])*(ll.lat-a[0])/(b[0]-a[0])+a[1])c=!c}}return c}
+function bbox(parts){let a=90,b=180,c=-90,d=-180;for(const part of parts)for(const q of part){if(q[0]<a)a=q[0];if(q[0]>c)c=q[0];if(q[1]<b)b=q[1];if(q[1]>d)d=q[1]}return[a,b,c,d]}
+function addIdx(g,bb,i){for(let a=Math.floor(bb[0]/CELL);a<=Math.floor(bb[2]/CELL);a++)for(let b=Math.floor(bb[1]/CELL);b<=Math.floor(bb[3]/CELL);b++){const k=a+':'+b;let v=g.get(k);if(!v)g.set(k,v=[]);v.push(i)}}
+function query(g,ll,Rm){const dLat=Rm/KY,dLng=dLat/Math.cos(ll.lat*Math.PI/180),s=new Set();
+  for(let a=Math.floor((ll.lat-dLat)/CELL);a<=Math.floor((ll.lat+dLat)/CELL);a++)for(let b=Math.floor((ll.lng-dLng)/CELL);b<=Math.floor((ll.lng+dLng)/CELL);b++){const v=g.get(a+':'+b);if(v)for(const i of v)s.add(i)}return s}
+const mPerPx=()=>156543.03*Math.cos(map.getCenter().lat*Math.PI/180)/Math.pow(2,map.getZoom());
+
+// ---------- roads: metric, threshold, gaps
+const val=o=>metric==='di'?o.di:metric==='sw'?o.sw:metric==='max'?o.mx:o.lv[+metric];
+const labels=()=>(metric==='di'||metric==='sw')?M.rankTxt:M.levelTxt;
+const metricName=()=>metric==='di'?'Construction District priority':metric==='sw'?'Statewide priority':metric==='max'?'Highest need, any category':M.cats[+metric].label;
+const gapOk=o=>gap==='all'||(gap==='none'?o.pj.length===0:gap==='any'?o.pj.length>0:o.npast>0);
+function styleSegs(){gN.clearLayers();const order=[[],[],[],[],[]];let mi=0,miNo=0,miHi=0,miHiNo=0;
+  for(const o of segs){const v=val(o);o.shown=v>=minLv&&gapOk(o);if(v>=3){miHi+=o.mi;if(!o.pj.length)miHiNo+=o.mi}if(o.shown){order[v].push(o);mi+=o.mi;if(!o.pj.length)miNo+=o.mi}}
+  if($('lyRoads').checked)order.forEach((arr,v)=>arr.forEach(o=>{o.layer.setStyle({color:COL[v],weight:v?1.4+v*.8:1,opacity:v?.95:.55});gN.addLayer(o.layer)}));
+  const lb=labels();
+  $('legend').innerHTML=lb.map((t,i)=>`<button data-l="${i}" class="${i<minLv?'off':''}" title="Show from ${esc(t)}"><i style="background:${COL[i]}"></i>${esc(t)}</button>`).join('');
+  $('tiles').innerHTML=`<div class="tile"><b>${num(mi)} mi</b><span>of road shown</span></div><div class="tile"><b>${mi?Math.round(100*miNo/mi):0}%</b><span>of it has no project</span></div>
+   <div class="tile"><b>${num(miHi)} mi</b><span>${esc(lb[3])} or ${esc(lb[4])}</span></div><div class="tile"><b>${num(miHiNo)} mi</b><span>of that with no project</span></div>`;
+  $('mapleg').innerHTML=`<b>${esc(metricName())}</b>`+lb.map((t,i)=>i>=Math.max(minLv,1)||minLv===0?`<span><i style="background:${COL[i]}"></i>${esc(t)}</span>`:'').join('')}
+
+// ---------- projects: filters
+function passes(p){const c=Fl.chips;if(p.net?Fl.net==='hide':Fl.net==='only')return false;
+  if(c.has('past')&&!p.past)return false;if(c.has('dp')&&p.di<3)return false;if(c.has('sp')&&p.sw<3)return false;
+  if(c.has('funded')&&p.grp==='Unfunded Application')return false;
+  if((c.has('bp')||c.has('tr'))&&!((c.has('bp')&&(p.bp||p.mg==='Bike / Ped'))||(c.has('tr')&&(p.tr||p.mg==='Transit'))))return false;
+  const s=Object.keys(SRC).filter(k=>c.has(k));if(s.length&&!s.some(k=>SRC[k](p)))return false;
+  if(Fl.mode&&p.mg!==Fl.mode)return false;if(Fl.cost&&p.cc!==Fl.cost)return false;
+  if(Fl.q&&!p.search.includes(Fl.q))return false;return true}
+function drawProjects(){gP.clearLayers();if(!$('lyProj').checked)return;for(const p of projects){p.ok=passes(p);if(p.ok)gP.addLayer(p.layer)}}
+function listed(){let a=projects.filter(p=>p.ok);
+  if(scope==='view'){const b=map.getBounds();a=a.filter(p=>p.bb[0]<=b.getNorth()&&p.bb[2]>=b.getSouth()&&p.bb[1]<=b.getEast()&&p.bb[3]>=b.getWest())}
+  else if(scope==='sel'&&selSet)a=a.filter(p=>selSet.has(p));
+  const s=Fl.sort;a.sort((x,y)=>s==='cost'?(y.cost||0)-(x.cost||0):s==='pri'?y.di-x.di||y.sw-x.sw:s==='fy'?(y.fy||0)-(x.fy||0):0||x.n.localeCompare(y.n));return a}
+const prow=p=>`<div class="prow${p===curProj?' sel':''}" data-i="${p.i}"><i class="dot" style="background:${GRP[p.grp]||'#9e9e9e'}"></i><div><b>${esc(p.n)}</b><small><code>${esc(p.id)}</code> ${esc(p.grp)} &middot; ${esc(p.cost!=null?money(p.cost):p.cc)}${p.fy?' &middot; '+p.fy:''}${p.net?' &middot; Network-wide':''}</small></div></div>`;
+function renderList(){projects.forEach(p=>p.ok=passes(p));const a=listed();
+  $('cnt').textContent=`${num(a.length)} project${a.length===1?'':'s'}`;$('ptabn').textContent=scope==='sel'&&selSet?`(${a.length} here)`:'';
+  $('scopebar').innerHTML=scope==='sel'?(selSet?`<div class="scopebar"><span>Projects ${esc(selLabel)}</span><button class="link" id="scl">Show all</button></div>`:'<div class="scopebar"><span>Click a road or a place on the map to list the projects there.</span></div>'):'';
+  if($('scl'))$('scl').onclick=()=>setScope('all');
+  $('plist').innerHTML=(a.slice(0,listMax).map(prow).join('')||'<p class="dim">No projects match.</p>')+(a.length>listMax?`<p><button class="btn" id="more">Show ${Math.min(150,a.length-listMax)} more</button></p>`:'');
+  if($('more'))$('more').onclick=()=>{listMax+=150;renderList()}}
+function setScope(s){scope=s;listMax=150;document.querySelectorAll('#sseg button').forEach(b=>b.classList.toggle('on',b.dataset.s===s));renderList()}
+function refilter(){listMax=150;drawProjects();renderList();if(sel&&!curProj)renderSel(false)}
+
+// ---------- district loading (one data file per district; Statewide loads them all)
+const ALL='Statewide',REG=new Map(),BUILT={};
+function fetchDistrict(d){return new Promise((res,rej)=>{if(window.PRIORITY_DATA[d.name])return res();const s=document.createElement('script');s.src='explorer_data/'+d.file;s.onload=res;s.onerror=()=>rej(d.file);document.head.appendChild(s)})}
+function buildDistrict(name){if(BUILT[name])return BUILT[name];const R=window.PRIORITY_DATA[name];
+  const ps=R.projects.map(p=>{const q=REG.get(p.id);if(q)return q;const polys=p.g.map(poly=>poly.map(dec));p.polys=polys;p.rings=polys.flat();p.bb=bbox(p.rings);p.ni=[];delete p.g;
+    p.search=(p.n+' '+p.id+' '+(p.upc||'')).toLowerCase();
+    p.layer=L.polygon(polys,{renderer:rP,pane:'proj',interactive:false,color:GRP[p.grp]||'#555',weight:1,opacity:.85,fillOpacity:.22,dashArray:p.net?'4 3':null});REG.set(p.id,p);return p});
+  const ss=R.needs.map(x=>{const parts=x[0].map(dec),o={parts,bb:bbox(parts),name:x[1],sw:x[2],di:x[3],lv:x[4],pj:x[5].map(j=>ps[j]),npast:x[6],rs:R.rs[x[7]],fc:R.fc[x[8]],mi:x[9],mx:Math.max(...x[4]),
+    layer:L.polyline(parts,{renderer:rN,pane:'road',interactive:false})};o.pj.forEach(p=>p.ni.push(o));return o});
+  delete window.PRIORITY_DATA[name];window.PRIORITY_DATA[name]=1;return BUILT[name]={segs:ss,projects:ps}}
+let curDistrict=null;function activate(name){let d;curDistrict=name;
+  if(name===ALL){if(!BUILT[ALL]){const seen=new Set(),ps=[],ss=[];M.districts.forEach(x=>{const b=buildDistrict(x.name);for(const o of b.segs)ss.push(o);for(const p of b.projects)if(!seen.has(p)){seen.add(p);ps.push(p)}});BUILT[ALL]={segs:ss,projects:ps}}
+    D=BUILT[ALL];d={b:[Math.min(...M.districts.map(x=>x.b[0])),Math.min(...M.districts.map(x=>x.b[1])),Math.max(...M.districts.map(x=>x.b[2])),Math.max(...M.districts.map(x=>x.b[3]))]}}
+  else{D=buildDistrict(name);d=M.districts.find(x=>x.name===name)}
+  gN.clearLayers();gP.clearLayers();closeRight();
+  if(!D.idxS){D.idxS=new Map();D.idxP=new Map();D.segs.forEach(o=>addIdx(D.idxS,o.bb,o));D.projects.forEach(p=>addIdx(D.idxP,p.bb,p))}
+  segs=D.segs;projects=D.projects;idxS=D.idxS;idxP=D.idxP;document.querySelector('#sseg button[data-s=all]').textContent=name===ALL?'Whole state':'Whole district';{const k=projects.filter(p=>p.net).length;$('netbox').style.display=k?'':'none';$('netn').textContent='('+num(k)+')'}projects.forEach((p,i)=>p.i=i);
+  if(name===ALL&&minLv<3)minLv=3;
+  styleSegs();drawProjects();setScope('all');map.fitBounds([[d.b[1],d.b[0]],[d.b[3],d.b[2]]]);
+  $('meta').textContent=`${name}: ${num(segs.length)} road segments, ${num(projects.length)} projects and studies. Data built ${M.generated}.`+(name===ALL?' Statewide opens showing the top two levels only, to keep the map quick; click a legend colour to show more.':'');
+  $('loading').style.display='none'}
+function loadDistrict(name){const L_=$('loading');L_.textContent=name===ALL?'Loading all districts ...':'Loading ...';L_.style.display='flex';
+  const need=name===ALL?M.districts:[M.districts.find(x=>x.name===name)];
+  return Promise.all(need.map(fetchDistrict)).then(()=>new Promise(r=>setTimeout(()=>{activate(name);r()},30))).catch(f=>{L_.textContent='Could not load explorer_data/'+f+' - keep the explorer_data folder next to this file.'})}
+
+// ---------- hit testing
+function roadAt(ll,tol){let best=null,bd=tol;if(!$('lyRoads').checked)return null;for(const o of query(idxS,ll,tol)){if(!o.shown)continue;const d=distTo(o.parts,ll);if(d<bd){bd=d;best=o}}return best}
+function projectsAt(ll,Rm){const out=[];if(!$('lyProj').checked&&!Rm)return out;for(const p of query(idxP,ll,Rm||1)){if(!p.ok)continue;
+  if(inside(p.rings,ll)||(Rm&&distTo(p.rings,ll)<=Rm))out.push(p)}return out.sort((a,b)=>a.n.localeCompare(b.n))}
+function areaAt(ll,Rft){const R=Rft*.3048,hit=[];for(const o of query(idxS,ll,R)){if(distTo(o.parts,ll)<=R)hit.push(o)}
+  return{hit,lv:M.cats.map((c,i)=>hit.reduce((m,o)=>Math.max(m,o.lv[i]),0)),sw:hit.reduce((m,o)=>Math.max(m,o.sw),0),di:hit.reduce((m,o)=>Math.max(m,o.di),0),pr:projectsAt(ll,R)}}
+
+function queryBB(g,bb){const s=new Set();for(let a=Math.floor(bb[0]/CELL);a<=Math.floor(bb[2]/CELL);a++)for(let b=Math.floor(bb[1]/CELL);b<=Math.floor(bb[3]/CELL);b++){const v=g.get(a+':'+b);if(v)for(const i of v)s.add(i)}return s}
+const ccw=(a,b,c)=>(c[0]-a[0])*(b[1]-a[1])-(b[0]-a[0])*(c[1]-a[1]);
+const segX=(a,b,c,d)=>ccw(a,b,c)*ccw(a,b,d)<0&&ccw(c,d,a)*ccw(c,d,b)<0;
+function hitsPoly(parts,ring,closed){for(const part of parts)for(let i=0;i<part.length;i++){if(inside([ring],{lat:part[i][0],lng:part[i][1]}))return true;const b=part[i+1]||(closed?part[0]:null);
+  if(b)for(let j=0,k=ring.length-1;j<ring.length;k=j++)if(segX(part[i],b,ring[k],ring[j]))return true}return false}
+function areaIn(ring){const bb=bbox([ring]),hit=[],pr=[];for(const o of queryBB(idxS,bb))if(hitsPoly(o.parts,ring,false))hit.push(o);
+  for(const p of queryBB(idxP,bb))if(p.ok&&(hitsPoly(p.rings,ring,true)||inside(p.rings,{lat:ring[0][0],lng:ring[0][1]})))pr.push(p);pr.sort((a,b)=>a.n.localeCompare(b.n));
+  return{hit,lv:M.cats.map((c,i)=>hit.reduce((m,o)=>Math.max(m,o.lv[i]),0)),sw:hit.reduce((m,o)=>Math.max(m,o.sw),0),di:hit.reduce((m,o)=>Math.max(m,o.di),0),pr}}
+function polySqMi(r){let a=0;const q=r.map(x=>toXY(x[0],x[1],r[0][0]));for(let i=0,j=q.length-1;i<q.length;j=i++)a+=q[j][0]*q[i][1]-q[i][0]*q[j][1];return Math.abs(a)/2/2589988}
+// ---------- draw-a-polygon tool
+let draw=null,drawT=0;const gD=L.layerGroup().addTo(map);
+function drawShow(cur){gD.clearLayers();const pts=cur?draw.concat([[cur.lat,cur.lng]]):draw;if(pts.length>2)L.polygon(pts,{renderer:rH,pane:'hi',color:'#0b5cad',weight:2,dashArray:'5 4',fillOpacity:.08}).addTo(gD);else if(pts.length>1)L.polyline(pts,{renderer:rH,pane:'hi',color:'#0b5cad',weight:2,dashArray:'5 4'}).addTo(gD);
+  draw.forEach(q=>L.circleMarker(q,{renderer:rH,pane:'hi',radius:4,color:'#0b5cad',weight:2,fillColor:'#fff',fillOpacity:1}).addTo(gD))}
+function drawStart(){draw=[];map.doubleClickZoom.disable();$('drawbtn').textContent='Cancel drawing';$('drawbtn').classList.add('on');$('tip').style.display='none';
+  $('hint').textContent='Click to add corners. Double-click, or click the first corner, to finish (Esc cancels)';$('hint').style.display='block';map.getContainer().style.cursor='crosshair'}
+function drawEnd(done){drawT=Date.now();const pts=(draw||[]).filter((q,i,a)=>!i||q[0]!==a[i-1][0]||q[1]!==a[i-1][1]);draw=null;gD.clearLayers();setTimeout(()=>map.doubleClickZoom.enable(),300);
+  $('drawbtn').textContent='Draw area';$('drawbtn').classList.remove('on');$('hint').style.display='none';map.getContainer().style.cursor='';
+  if(done&&pts.length>=3){sel={poly:pts,ll:L.latLng(pts.reduce((m,q)=>m+q[0],0)/pts.length,pts.reduce((m,q)=>m+q[1],0)/pts.length),road:null,here:[]};curProj=null;rtab='area';renderSel(true)}}
+map.on('dblclick',()=>{if(draw)drawEnd(true)});map.on('mousemove',e=>{if(draw&&draw.length)drawShow(e.latlng)});
+document.addEventListener('keydown',e=>{if(!draw)return;if(e.key==='Escape')drawEnd(false);if(e.key==='Enter')drawEnd(true)});
+
+// ---------- right panel pieces
+function needList(lv,none){const rows=M.cats.map((c,i)=>[lv[i],c.label]).filter(r=>r[0]>0).sort((a,b)=>b[0]-a[0]||a[1].localeCompare(b[1]));
+  if(!rows.length)return `<p class="dim">${none||'No identified need.'}</p>`;
+  return (rows[0][0]<M.high?'<p class="sub">Nothing rated High - the highest needs are shown.</p>':'')+'<table class="nt">'+rows.map(r=>`<tr><td>${esc(r[1])}</td><td>${chip(r[0],M.levelTxt[r[0]])}</td></tr>`).join('')+'</table>'}
+function projLists(arr){const past=arr.filter(p=>p.past),other=arr.filter(p=>!p.past);
+  return `<div class="h-past"><h3>Past projects and studies (${past.length})</h3>${past.map(prow).join('')||'<p class="dim">None</p>'}</div><h3 class="h-act">Active, planned and proposed (${other.length})</h3>${other.map(prow).join('')||'<p class="dim">None</p>'}`}
+function openRight(){$('right').classList.remove('closed');$('hint').style.display='none';map.invalidateSize({pan:false})}
+function closeRight(){$('right').classList.add('closed');gH.clearLayers();sel=null;curProj=null;selSet=null;if(scope==='sel')setScope('all');else renderList();map.invalidateSize({pan:false})}
+function hiRoad(o){L.polyline(o.parts,{renderer:rH,pane:'hi',color:'#14253d',weight:10,opacity:.9}).addTo(gH);L.polyline(o.parts,{renderer:rH,pane:'hi',color:COL[val(o)]||COL[0],weight:5,opacity:1}).addTo(gH)}
+function hiProj(p,withRoads){if(withRoads)p.ni.forEach(o=>{L.polyline(o.parts,{renderer:rH,pane:'hi',color:'#14253d',weight:7}).addTo(gH);L.polyline(o.parts,{renderer:rH,pane:'hi',color:COL[val(o)],weight:4}).addTo(gH)});
+  L.polygon(p.polys,{renderer:rH,pane:'hi',color:'#0b5cad',weight:2.5,fillColor:'#0b5cad',fillOpacity:withRoads&&p.ni.length?.08:.25,dashArray:withRoads&&p.ni.length?'5 4':null}).addTo(gH)}
+
+function pick(ll){const tol=Math.max(8*mPerPx(),6),road=roadAt(ll,tol),here=projectsAt(ll,0);
+  sel={ll,road,here};curProj=null;rtab=road?'road':here.length?'here':'area';
+  if(rtab==='here'&&here.length===1){renderSel(true);return showProject(here[0],false)}renderSel(true)}
+function renderSel(switchList){if(!sel)return;curProj=null;gH.clearLayers();const ll=sel.ll,area=sel.poly?areaIn(sel.poly):areaAt(ll,radiusFt);sel.here=sel.poly?[]:projectsAt(ll,0);
+  const rl=miTxt(radiusFt);
+  $('rtabs').innerHTML=sel.poly?'<button data-r="area">Drawn area</button>':(sel.road?`<button data-r="road">Road</button>`:'')+`<button data-r="here">Projects here (${sel.here.length})</button><button data-r="area">Area (${rl})</button>`;
+  document.querySelectorAll('#rtabs button').forEach(b=>{b.classList.toggle('on',b.dataset.r===rtab);b.onclick=()=>{rtab=b.dataset.r;renderSel(true)}});
+  let h='';
+  if(rtab==='road'){const o=sel.road,pj=o.pj.filter(p=>p.ok).sort((a,b)=>a.n.localeCompare(b.n));hiRoad(o);selSet=new Set(pj);selLabel='on '+(o.name||'this road');
+    h=`<h2>${esc(o.name||'Unnamed road')}</h2><div class="sub">${esc([o.rs,o.fc].filter(Boolean).join(' | '))}</div>
+      <h3>Priority</h3><div class="cards">${pcard('Statewide',o.sw)}${pcard('District',o.di)}</div>
+      <h3>Needs on this road</h3>${needList(o.lv)}${projLists(pj)}`}
+  else if(rtab==='here'){selSet=new Set(sel.here);selLabel='at this point';L.circleMarker(ll,{renderer:rH,pane:'hi',radius:6,color:'#14253d',weight:2,fillColor:'#fff',fillOpacity:1}).addTo(gH);
+    h=`<h2>Projects at this point</h2><div class="sub">Footprints that cover the place you clicked.</div>${sel.here.length?projLists(sel.here):'<p class="dim">No project footprint here. Try the Area tab.</p>'}`}
+  else{selSet=new Set(area.pr);selLabel=sel.poly?'in the drawn area':'within '+rl;if(sel.poly)L.polygon(sel.poly,{renderer:rH,pane:'hi',color:'#0b5cad',weight:2,fillOpacity:.06}).addTo(gH);else selCircle=L.circle(ll,{renderer:rH,pane:'hi',radius:radiusFt*.3048,color:'#0b5cad',weight:1.5,fillOpacity:.06}).addTo(gH);
+    const roads=[...new Set(area.hit.map(o=>o.name).filter(Boolean))];
+    h=`<h2>${sel.poly?'Drawn area':'Area summary'}</h2>${sel.poly?`<div class="sub">${num(polySqMi(sel.poly),2)} sq mi. Press Draw area on the map to draw a new one.</div>`:''}<div class="rad" style="${sel.poly?'display:none':''}"><span>Radius</span><input type="range" id="rslide" min="0.05" max="2" step="0.05" value="${radiusFt/5280}" aria-label="Search radius in miles"><b id="rval">${rl}</b></div>
+      <div class="sub">${area.hit.length} road segments${roads.length?' on '+esc(roads.slice(0,6).join(', '))+(roads.length>6?' and '+(roads.length-6)+' more':''):''}</div>
+      <h3>Priority</h3><div class="cards">${pcard('Best statewide',area.sw)}${pcard('Best district',area.di)}</div>
+      <h3 class="h-needs">Needs in this area</h3>${needList(area.lv,'No VTrans need segments within this distance.')}${projLists(area.pr)}`}
+  $('rbody').innerHTML=h;$('rbody').scrollTop=0;openRight();
+  const rs=$('rslide');if(rs){rs.oninput=()=>{const ft=rs.value*5280;$('rval').textContent=miTxt(ft);if(selCircle)selCircle.setRadius(ft*.3048)};rs.onchange=()=>{radiusFt=rs.value*5280;renderSel(true);const n=$('rslide');if(n)n.focus()}}
+  if(switchList){scope='sel';setScope('sel')}else renderList()}
+
+function showProject(p,zoom){curProj=p;gH.clearLayers();hiProj(p,true);
+  $('rtabs').innerHTML=sel?'<button id="back">&larr; Back to location</button>':'<button class="on">Project</button>';
+  if($('back'))$('back').onclick=()=>renderSel(false);
+  let md=p.md||'Other';const mp=md.split(' - ');if(mp.length>1)md=mp[0]+' ('+mp[1]+')';
+  const kv=(k,v)=>v?`<tr><td>${k}</td><td>${v}</td></tr>`:'';
+  let c1=`<div class="big">${money(p.cost)}</div>`;
+  if(p.pct!=null)c1+=`<div class="bar"><i style="width:${Math.max(0,Math.min(100,p.pct))}%"></i></div><small>${p.exp!=null?money(p.exp)+' spent ':''}(${p.pct}%)</small>`;
+  else if(p.ssr!=null)c1+=`<small>SMART SCALE request ${money(p.ssr)}</small>`;
+  let c2=`<div class="big">${esc(p.ph||(p.ssfy?'FY'+p.ssfy+' application':p.st||'-'))}</div>`;
+  if(p.cn0)c2+=`<small>Construction ${p.cn0}${p.cn1?' - '+p.cn1:''}</small>`;else if(p.fy)c2+=`<small>Year ${p.fy}</small>`;
+  $('rbody').innerHTML=`<div>${stchip(p.grp)}</div><h2>${esc(p.n)}</h2>
+    <table class="kv">${kv('Project ID',`<code>${esc(p.id)}</code>`)}${kv('Source',esc(p.s))}${kv('Type',esc(md)+(p.rs?' &middot; '+esc(p.rs):''))}${kv('Program',esc(p.pg==='Other SYIP program'?'No program tag':p.pg))}
+      ${kv('Came from',p.ln&&(p.og.length||p.lk)?esc(p.ln):'')}${kv('Linked record',esc(p.lk))}${kv('Jurisdiction',esc(p.ju))}${kv('Length',p.mi?num(p.mi,2)+' mi ('+esc(p.ec)+')':esc(p.ec))}</table>
+    <p><button class="btn" id="zoom">Zoom to project</button>${p.url?` &nbsp;<a href="${esc(p.url)}" target="_blank" rel="noopener">Open project / study page</a>`:''}</p>
+    ${p.net?'<div class="note"><b>Network-wide project</b><br>Citywide or districtwide work that touches many roads. It is not matched to individual roads, so no priority is read for it and it is left out of the road counts.</div>':`<h3>Priority</h3><div class="cards">${pcard('Best statewide',p.sw)}${pcard('Best district',p.di)}</div>`}
+    <div class="cards"><div class="card"><span>Cost / estimate</span>${c1}</div><div class="card"><span>Phase</span>${c2}</div></div>
+    ${p.net?'':'<h3 class="h-needs">Needs covered</h3>'}${p.net?'':p.mt==='NO_NEED_SEGMENT'||!p.ni.length&&!Math.max(...p.lv)?'<p class="dim">No VTrans need segment runs along this project.</p>':needList(p.lv)+`<p class="sub">${p.ni.length} matched road segments are outlined on the map.</p>`}
+    ${p.ds?`<h3>Description</h3><p>${esc(p.ds)}</p>`:''}
+    ${p.gc!=='HIGH'&&p.gn?`<div class="note"><b>Location confidence: ${esc(p.gc)}</b><br>${esc(p.gn)}</div>`:''}`;
+  $('rbody').scrollTop=0;openRight();const fit=()=>map.fitBounds([[p.bb[0],p.bb[1]],[p.bb[2],p.bb[3]]],{padding:[60,60],maxZoom:16});
+  $('zoom').onclick=fit;if(zoom)fit();
+  document.querySelectorAll('#plist .prow').forEach(el=>el.classList.toggle('sel',+el.dataset.i===p.i))}
+
+// ---------- wiring
+function rowEvents(box){box.addEventListener('click',e=>{const r=e.target.closest('.prow');if(r)showProject(projects[+r.dataset.i],box.id==='plist')});
+  box.addEventListener('mouseover',e=>{const r=e.target.closest('.prow');gHov.clearLayers();if(r){const p=projects[+r.dataset.i];L.polygon(p.polys,{renderer:rH,pane:'hi',color:'#00b7ff',weight:3,fillColor:'#00b7ff',fillOpacity:.25}).addTo(gHov)}});
+  box.addEventListener('mouseleave',()=>gHov.clearLayers())}
+rowEvents($('plist'));rowEvents($('rbody'));
+map.on('click',e=>{if(draw){const near=q=>map.latLngToContainerPoint(q).distanceTo(e.containerPoint)<9,n=draw.length;if(n>=3&&(near(draw[n-1])||near(draw[0])))return drawEnd(true);if(n&&near(draw[n-1]))return;draw.push([e.latlng.lat,e.latlng.lng]);return drawShow()}if(Date.now()-drawT<600)return;if(!D||!segs.length)return;if(circleOn)return circleAt(e.latlng);pick(e.latlng)});
+let circleOn=false;function setCircle(on){circleOn=!!on;$('circbtn').classList.toggle('on',circleOn);$('circbtn').textContent=circleOn?'Circle: on':'Circle';$('hint').textContent=circleOn?'Click anywhere to summarise a circle around it':'Click a road, a project or anywhere on the map';$('hint').style.display=circleOn?'block':'none';map.getContainer().style.cursor=circleOn?'crosshair':''}
+function circleAt(ll,mi){if(mi)radiusFt=mi*5280;sel={ll:L.latLng(ll),road:null,here:[]};curProj=null;rtab='area';renderSel(true)}
+$('circbtn').onclick=()=>{if(draw)drawEnd(false);setCircle(!circleOn);if(!circleOn&&sel&&!sel.poly&&rtab==='area')closeRight()};
+$('drawbtn').onclick=()=>{if(draw)return drawEnd(false);if(!D)return;setCircle(false);drawStart()};
+let raf=0;map.on('mousemove',e=>{if(raf||!D||draw)return;raf=requestAnimationFrame(()=>{raf=0;const tip=$('tip'),o=roadAt(e.latlng,Math.max(6*mPerPx(),5));let t='';
+  if(o)t=(o.name||'Road')+' - '+labels()[val(o)];else{const h=map.getZoom()>=11?projectsAt(e.latlng,0):[];if(h.length)t=h[0].n+(h.length>1?' (+'+(h.length-1)+' more)':'')}
+  map.getContainer().style.cursor=t?'pointer':'';if(t){tip.textContent=t;tip.style.display='block';tip.style.left=(e.containerPoint.x+14)+'px';tip.style.top=(e.containerPoint.y+14)+'px'}else tip.style.display='none'})});
+map.on('mouseout',()=>{$('tip').style.display='none'});
+map.on('moveend',()=>{if(scope==='view')renderList()});
+$('rclose').onclick=closeRight;
+document.querySelectorAll('#ltabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#ltabs button').forEach(x=>x.classList.toggle('on',x===b));['pri','proj'].forEach(t=>$('pane-'+t).classList.toggle('on',t===b.dataset.t))});
+// priority types, each with a one-line note on how VTrans builds it (2025 VTrans Prioritized Mid-term Needs)
+const PEXPL={
+ di:'<b>Construction District priority.</b> VTrans rates every need Low to Very High within its category (severity and number of users affected), weights and adds the CoSS, Regional Network, Safety and UDA/IEDA needs, adjusts for influencing factors (bridge and pavement condition, flooding and sea-level-rise exposure, economically distressed communities) and ranks locations within the district: Priority 1 is the top tier.',
+ sw:'<b>Statewide priority.</b> Same steps, but only Corridors of Statewide Significance and Safety needs count, and locations are ranked across the whole Commonwealth. Priority 1 locations are eligible for Project Pipeline study funding.',
+ max:'<b>Highest need in any category.</b> The strongest single VTrans need on each road, before any weighting: useful to see what a road is weak at.',
+ COSS_CONG:'Recurring delay on a <b>Corridor of Statewide Significance</b>, rated by how severe it is and how many travellers it affects.',
+ COSS_REL:'Unreliable travel times (unexpected delay) on a <b>Corridor of Statewide Significance</b>.',
+ COSS_RAIL:'Passenger rail on-time performance along a <b>Corridor of Statewide Significance</b>.',
+ COSS_CAP:'Keeping the capacity of a <b>Corridor of Statewide Significance</b> working (for example, managing access) before it degrades.',
+ COSS_TDM:'Places on a <b>Corridor of Statewide Significance</b> where demand management (carpool, transit, telework, park and ride) can help.',
+ RN_CONG:'Recurring delay within a <b>Regional Network</b> (metro-area travel).',
+ RN_REL:'Unreliable travel times within a <b>Regional Network</b>.',
+ RN_CAP:'Preserving the capacity of key <b>Regional Network</b> roads.',
+ RN_TDM:'<b>Regional Network</b> places where demand management can help.',
+ RN_TREQ:'<b>Transit equity:</b> gaps in transit access for communities that rely on it most.',
+ RN_TRAN:'<b>Transit access</b> to and within activity centers.',
+ RN_BIKE:'<b>Bicycle access</b> gaps in activity centers.',
+ RN_PED:'<b>Pedestrian access</b> gaps in activity centers.',
+ IEDA:'Access to <b>Industrial and Economic Development Areas</b> (the UDA travel market).',
+ SAF_DIST:'<b>Road safety</b> need on segments, ranked within the district (crash history and potential for safety improvement).',
+ SAF_STATE:'<b>Road safety</b> need on segments, ranked statewide.',
+ SAF_PED:'<b>Pedestrian safety</b> need: locations with pedestrian crash risk.'};
+const ptype=$('ptype');
+{const g1=document.createElement('optgroup');g1.label='Overall priority';[['di','Construction District priority'],['sw','Statewide priority']].forEach(([v,t])=>g1.appendChild(new Option(t,v)));
+ const g2=document.createElement('optgroup');g2.label='Specific VTrans need';g2.appendChild(new Option('Highest need, any category','max'));M.cats.forEach((c,i)=>g2.appendChild(new Option(c.label,String(i))));ptype.append(g1,g2)}
+function setMetric(m){m=String(m);if(!['di','sw','max'].includes(m)&&isNaN(+m)){const k=M.cats.findIndex(c=>c.code===m);m=k<0?'di':String(k)}metric=m;ptype.value=metric;const code=(metric==='di'||metric==='sw'||metric==='max')?metric:M.cats[+metric].code;
+  $('pinfo').innerHTML=(PEXPL[code]||'')+(metric!=='di'&&metric!=='sw'&&metric!=='max'?' <span class="dim">Levels: Low, Medium, High, Very High.</span>':'');styleSegs();if(sel&&!curProj)renderSel(false)}
+ptype.onchange=()=>setMetric(ptype.value);
+$('legend').onclick=e=>{const b=e.target.closest('button');if(b){minLv=+b.dataset.l;styleSegs()}};
+document.querySelectorAll('#gseg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#gseg button').forEach(x=>x.classList.toggle('on',x===b));gap=b.dataset.g;styleSegs()});
+$('lyRoads').onchange=styleSegs;$('lyProj').onchange=drawProjects;document.querySelectorAll('#bseg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#bseg button').forEach(x=>x.classList.toggle('on',x===b));map.removeLayer(BASE[base]);base=b.dataset.b;BASE[base].addTo(map)});
+$('chips').innerHTML=CHIPS.map(c=>`<button class="fchip" data-c="${c[0]}">${c[1]}</button>`).join('');
+$('chips').onclick=e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.c;Fl.chips.has(k)?Fl.chips.delete(k):Fl.chips.add(k);b.classList.toggle('on');refilter()};
+const fmode=$('fmode'),fcost=$('fcost');fmode.add(new Option('All types',''));M.modes.forEach(m=>fmode.add(new Option(m,m)));fcost.add(new Option('Any cost',''));M.costs.forEach(m=>fcost.add(new Option(m,m)));
+fmode.onchange=()=>{Fl.mode=fmode.value;refilter()};fcost.onchange=()=>{Fl.cost=fcost.value;refilter()};
+$('sort').onchange=e=>{Fl.sort=e.target.value;renderList()};
+let qt=0;$('q').oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{Fl.q=e.target.value.trim().toLowerCase();refilter()},180)};
+$('clr').onclick=()=>{Fl.chips.clear();Fl.mode=Fl.cost=Fl.q='';fmode.value=fcost.value=$('q').value='';document.querySelectorAll('.fchip').forEach(b=>b.classList.remove('on'));setNet('hide')};
+document.querySelectorAll('#sseg button').forEach(b=>b.onclick=()=>setScope(b.dataset.s));
+const setNet=v=>{Fl.net=v;document.querySelectorAll('#nseg button').forEach(x=>x.classList.toggle('on',x.dataset.n===v));refilter()};
+document.querySelectorAll('#nseg button').forEach(b=>b.onclick=()=>setNet(b.dataset.n));
+$('csv').onclick=()=>{const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"',rows=[['Project ID','Name','Source','Status','Type','Program','Cost','Year','Best statewide priority','Best district priority','High needs']];
+  listed().forEach(p=>rows.push([p.id,p.n,p.s,p.grp,p.md,p.pg,p.cost,p.fy,M.rankTxt[p.sw],M.rankTxt[p.di],M.cats.filter((c,i)=>p.lv[i]>=M.high).map(c=>c.label).join('; ')]));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(q).join(',')).join('\r\n')],{type:'text/csv'}));a.download='projects.csv';a.click()};
+
+// =====================================================================
+// Scene engine: lets a presentation (or a link) put the app in an exact state.
+// Every scene is a full state, so stepping backwards restores the previous view.
+//   window.postMessage({type:'pe-scene', scene:{...}})  or  PE.apply({...})
+// =====================================================================
+const PE={};
+function setTab(t){document.querySelectorAll('#ltabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===t));['pri','proj'].forEach(k=>$('pane-'+k).classList.toggle('on',k===t))}
+function setGap(g){gap=g;document.querySelectorAll('#gseg button').forEach(x=>x.classList.toggle('on',x.dataset.g===g))}
+function setBase(b){if(b===base)return;document.querySelectorAll('#bseg button').forEach(x=>x.classList.toggle('on',x.dataset.b===b));map.removeLayer(BASE[base]);base=b;BASE[base].addTo(map)}
+function setChips(list){Fl.chips=new Set(list||[]);document.querySelectorAll('.fchip').forEach(b=>b.classList.toggle('on',Fl.chips.has(b.dataset.c)))}
+function clearSpots(){$('spots').innerHTML=''}
+function spot(list){clearSpots();(list||[]).forEach((sp,k)=>{const el=document.querySelector(sp.sel);if(!el)return;const r=el.getBoundingClientRect(),pad=sp.pad==null?6:sp.pad;
+  const d=document.createElement('div');d.className='spot'+(k?' k1':'');d.style.left=(r.left-pad)+'px';d.style.top=(r.top-pad)+'px';d.style.width=(r.width+2*pad)+'px';d.style.height=(r.height+2*pad)+'px';
+  if(sp.label){const b=document.createElement('b');b.textContent=sp.label;const side=sp.side||'right';
+    if(side==='right'){b.style.left='calc(100% + 14px)';b.style.top='0'}else if(side==='left'){b.style.right='calc(100% + 14px)';b.style.top='0'}
+    else if(side==='below'){b.style.left='0';b.style.top='calc(100% + 12px)'}else{b.style.left='0';b.style.bottom='calc(100% + 12px)'}d.appendChild(b)}
+  d.style.animationDelay=(k*0.15)+'s';$('spots').appendChild(d)})}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+function flyTo(v,dur){if(!v)return wait(0);return new Promise(res=>{let done=false;const fin=()=>{if(!done){done=true;res()}};map.once('moveend',fin);setTimeout(fin,(dur||1.2)*1000+400);
+  if(v.b)map.flyToBounds(v.b,{duration:dur||1.2,padding:[40,40]});else map.flyTo(v.c,v.z,{duration:dur||1.2})})}
+async function animateDraw(poly){draw=null;gD.clearLayers();const pts=[];for(const q of poly){pts.push(q);gD.clearLayers();
+    if(pts.length>2)L.polygon(pts,{renderer:rH,pane:'hi',color:'#0b5cad',weight:2.5,dashArray:'6 4',fillOpacity:.08}).addTo(gD);else if(pts.length>1)L.polyline(pts,{renderer:rH,pane:'hi',color:'#0b5cad',weight:2.5,dashArray:'6 4'}).addTo(gD);
+    pts.forEach(x=>L.circleMarker(x,{renderer:rH,pane:'hi',radius:5,color:'#0b5cad',weight:2,fillColor:'#fff',fillOpacity:1}).addTo(gD));await wait(260)}
+  await wait(250);gD.clearLayers();sel={poly:poly.map(q=>[q[0],q[1]]),ll:L.latLng(poly.reduce((m,q)=>m+q[0],0)/poly.length,poly.reduce((m,q)=>m+q[1],0)/poly.length),road:null,here:[]};curProj=null;rtab='area';renderSel(true)}
+let sceneTok=0;
+PE.apply=async function(S){const tok=++sceneTok;S=S||{};clearSpots();
+  if(draw)drawEnd(false);gD.clearLayers();
+  const dist=S.district||curDistrict||M.start;
+  if(dist!==curDistrict){distSel.value=dist;await loadDistrict(dist);if(tok!==sceneTok)return}
+  if(!S.keepPanel)closeRight();
+  setBase(S.base||'light');
+  $('lyRoads').checked=S.roads!==false;$('lyProj').checked=S.proj!==false;
+  minLv=S.minLv==null?1:S.minLv;setGap(S.gap||'all');setMetric(S.metric==null?'di':S.metric);
+  setChips(S.chips);Fl.mode=S.mode||'';Fl.cost=S.cost||'';fmode.value=Fl.mode;fcost.value=Fl.cost;Fl.q=(S.q||'').toLowerCase();$('q').value=S.q||'';
+  Fl.net=S.net||'hide';document.querySelectorAll('#nseg button').forEach(x=>x.classList.toggle('on',x.dataset.n===Fl.net));
+  Fl.sort=S.sort||'name';$('sort').value=Fl.sort;drawProjects();
+  setTab(S.tab||'pri');setCircle(!!S.circleTool);
+  if(S.radius)radiusFt=S.radius*5280;else if(!S.keepPanel)radiusFt=1320;
+  setScope(S.scope||'all');
+  await flyTo(S.view,S.dur);if(tok!==sceneTok)return;
+  const A=S.action;
+  if(A){if(A.type==='circle'){circleAt(A.at,A.r);if(A.rtab){rtab=A.rtab;renderSel(true)}}
+    else if(A.type==='pick'){pick(L.latLng(A.at));if(A.rtab){rtab=A.rtab;renderSel(true)}}
+    else if(A.type==='draw'){await animateDraw(A.poly);if(tok!==sceneTok)return}
+    else if(A.type==='project'){const p=projects.find(x=>x.id===A.id);if(p){if(A.from){circleAt(A.from,A.r)}showProject(p,A.zoom!==false)}}
+    if(A.listTab)setTab('proj')}
+  if(S.scope)setScope(S.scope);
+  if(S.scroll){await wait(120);const el=document.querySelector(S.scroll);if(el){const box=el.closest('#rbody,#plist,.pane');if(box)box.scrollTop=Math.max(0,el.offsetTop-(box.id==='rbody'?60:10))}}
+  if(S.spot){await wait(S.spotDelay==null?450:S.spotDelay);if(tok!==sceneTok)return;spot(S.spot)}
+  if(window.parent!==window)window.parent.postMessage({type:'pe-ready',tok},'*')};
+addEventListener('message',e=>{const m=e.data||{};if(m.type==='pe-scene')PE.apply(m.scene);if(m.type==='pe-spots')spot(m.spots)});
+addEventListener('resize',()=>clearSpots());
+window.PE=PE;
+// clicker / keyboard: when embedded in the presentation, forward next/back keys to it
+if(window.parent!==window){document.addEventListener('keydown',e=>{if(draw&&e.key==='Escape')return;
+  if(e.target.closest('input,select,textarea')&&!['PageDown','PageUp'].includes(e.key))return;
+  if(['PageDown','PageUp','ArrowRight','ArrowLeft','ArrowDown','ArrowUp',' ','b','B','.','Escape','f','F'].includes(e.key)){e.preventDefault();e.stopPropagation();window.parent.postMessage({type:'pe-key',key:e.key},'*')}},true)}
+const distSel=$('dist');if(M.districts.length>1)distSel.add(new Option(`Statewide - all ${M.districts.length} districts`,ALL));M.districts.forEach(d=>distSel.add(new Option(`${d.name} district - ${num(d.np)} projects`,d.name)));
+distSel.onchange=()=>loadDistrict(distSel.value);
+setMetric('di');distSel.value=M.districts.some(d=>d.name===M.start)?M.start:M.districts[0].name;loadDistrict(distSel.value).then(()=>{const h=new URLSearchParams(location.hash.slice(1));if(h.get('scene'))try{PE.apply(JSON.parse(decodeURIComponent(h.get('scene'))))}catch(e){}if(window.parent!==window)window.parent.postMessage({type:'pe-loaded'},'*')});
+</script></body></html>

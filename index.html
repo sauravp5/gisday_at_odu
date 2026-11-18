@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Visualizing Needs and Investments - ODU GIS Day 2026</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@font-face{font-family:'Barlow Condensed';font-weight:600;font-display:swap;src:url(assets/fonts/barlow-condensed-latin-600-normal.woff2) format('woff2')}@font-face{font-family:'Barlow Condensed';font-weight:700;font-display:swap;src:url(assets/fonts/barlow-condensed-latin-700-normal.woff2) format('woff2')}@font-face{font-family:'Barlow Condensed';font-weight:800;font-display:swap;src:url(assets/fonts/barlow-condensed-latin-800-normal.woff2) format('woff2')}@font-face{font-family:Barlow;font-weight:400;font-display:swap;src:url(assets/fonts/barlow-latin-400-normal.woff2) format('woff2')}@font-face{font-family:Barlow;font-weight:500;font-display:swap;src:url(assets/fonts/barlow-latin-500-normal.woff2) format('woff2')}@font-face{font-family:Barlow;font-weight:600;font-display:swap;src:url(assets/fonts/barlow-latin-600-normal.woff2) format('woff2')}@font-face{font-family:Barlow;font-weight:700;font-display:swap;src:url(assets/fonts/barlow-latin-700-normal.woff2) format('woff2')}@font-face{font-family:Barlow;font-weight:500;font-style:italic;font-display:swap;src:url(assets/fonts/barlow-latin-500-italic.woff2) format('woff2')}
+:root{--navy:#0a1f44;--navy2:#13306b;--blue:#0b35a0;--orange:#e04e1b;--ink:#14213a;--mute:#56627a;--line:#d9dee8;--paper:#f4f6fa;--white:#fbfcfe;
+  --green:#3f7a1d;--purple:#5b2a86;--teal:#0f6b73;--head:"Barlow Condensed","Arial Narrow",Arial,sans-serif;--body:Barlow,"Segoe UI",Arial,sans-serif}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:#0b0f18;overflow:hidden;font-family:var(--body);color:var(--ink)}
+button{font:inherit;color:inherit;cursor:pointer}
+#viewport{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+#stage{width:1920px;height:1080px;position:relative;flex:0 0 auto;transform-origin:center center;background:var(--white);overflow:hidden;box-shadow:0 10px 60px rgba(0,0,0,.5)}
+.slide{position:absolute;inset:0;background:var(--white);opacity:0;visibility:hidden;transition:opacity .45s ease,visibility 0s linear .45s}
+.slide.on{opacity:1;visibility:visible;transition:opacity .45s ease}
+/* shared pieces */
+.band{position:absolute;left:0;top:0;right:0;height:196px;background:var(--navy);display:flex}
+.band .tt{flex:1;padding:34px 0 0 72px;color:#fff}
+.band h1{font:800 76px/0.98 var(--head);margin:0;letter-spacing:.005em;text-transform:uppercase}
+.band .st{font:500 italic 28px/1.2 var(--body);margin-top:10px;opacity:.92}
+.band .ph{width:640px;position:relative;border-left:8px solid var(--orange)}
+.band .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.band.slim{height:150px}.band.slim .tt{padding-top:30px}.band.slim h1{font-size:70px}
+.lead{position:absolute;left:72px;right:72px;font:600 34px/1.3 var(--body);color:var(--navy)}
+.foot{position:absolute;left:72px;right:72px;bottom:22px;height:36px;display:flex;align-items:center;gap:22px;font:600 20px var(--body);color:var(--blue)}
+.foot img{height:30px}.foot i{width:2px;height:26px;background:var(--orange)}.foot .pn{margin-left:auto;color:var(--mute)}
+.ico{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--navy);color:#fff;flex:0 0 auto}
+.ico svg{width:56%;height:56%;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.msgbar{position:absolute;left:56px;right:56px;background:var(--navy);color:#fff;border-radius:14px;display:flex;align-items:center;gap:30px;padding:0 40px;font:600 32px/1.25 var(--body)}
+.msgbar .ico{background:transparent;border:3px solid #fff;width:76px;height:76px}
+.frag{opacity:0;transform:translateY(18px);transition:opacity .45s ease,transform .45s ease}
+.frag.in{opacity:1;transform:none}
+.hint{font:500 20px var(--body);color:var(--mute)}
+/* chrome */
+#bar{position:fixed;left:0;bottom:0;height:4px;background:var(--orange);transition:width .35s ease;z-index:20}
+#nav{position:fixed;right:18px;bottom:16px;display:flex;gap:6px;align-items:center;z-index:21;opacity:0;transition:opacity .3s}
+body.mouse #nav{opacity:1}
+#nav button{border:0;background:rgba(10,31,68,.85);color:#fff;width:42px;height:42px;border-radius:21px;font-size:20px}
+#nav span{color:#fff;background:rgba(10,31,68,.85);padding:10px 14px;border-radius:21px;font:600 15px var(--body)}
+#help{position:fixed;left:18px;bottom:16px;z-index:21;color:#fff;background:rgba(10,31,68,.85);padding:10px 14px;border-radius:21px;font:500 14px var(--body);opacity:0;transition:opacity .3s}
+body.mouse #help{opacity:1}
+#overview{position:fixed;inset:0;background:rgba(6,12,26,.96);z-index:30;display:none;overflow:auto;padding:40px}
+#overview.on{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:22px;align-content:start}
+#overview button{border:2px solid transparent;background:#16223d;color:#fff;border-radius:10px;padding:0;text-align:left;overflow:hidden}
+#overview button.cur{border-color:var(--orange)}
+#overview .thumb{height:190px;display:flex;align-items:center;justify-content:center;background:var(--navy);font:800 30px/1 var(--head);text-transform:uppercase;padding:20px;text-align:center}
+#overview .lbl{padding:10px 14px;font:600 16px var(--body)}
+/* S1 title */
+#s1 .logo{position:absolute;left:150px;top:360px;width:560px}
+#s1 .eyebrow{position:absolute;left:880px;top:300px;font:700 26px var(--body);color:var(--orange);letter-spacing:.14em;text-transform:uppercase}
+#s1 h1{position:absolute;left:880px;top:350px;width:900px;margin:0;font:700 66px/1.12 var(--body);color:var(--blue)}
+#s1 .names{position:absolute;left:880px;top:800px;border-left:6px solid var(--orange);padding-left:26px;font:500 40px/1.35 var(--body);color:var(--blue)}
+#s1 .date{position:absolute;left:1440px;top:850px;font:500 36px var(--body);color:var(--blue)}
+#s1 .hint{position:absolute;left:880px;bottom:60px}
+/* S2 planning */
+#s2 .lead{top:232px}
+#s2 .cards{position:absolute;left:72px;right:72px;top:340px;display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+.pcard{border:2px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;transition:transform .3s,box-shadow .3s}
+.pcard:hover{transform:translateY(-6px);box-shadow:0 18px 40px rgba(10,31,68,.18)}
+.pcard .hd{display:flex;align-items:center;gap:22px;padding:20px 24px;height:116px;font:600 30px/1.2 var(--body);color:var(--navy)}
+.pcard .hd .ico{width:76px;height:76px}
+.pcard .im{height:330px;overflow:hidden}.pcard .im img{width:100%;height:100%;object-fit:cover;transition:transform 2.5s ease}
+.pcard:hover .im img{transform:scale(1.07)}
+#s2 .before{position:absolute;left:72px;right:72px;top:830px;height:170px;border:2px solid #b9c4da;background:#e9eef8;border-radius:14px;display:flex;align-items:center;gap:40px;padding:0 44px}
+#s2 .before .ico{width:120px;height:120px}
+#s2 .before b{display:block;font:800 46px/1.05 var(--head);color:var(--navy);text-transform:uppercase}
+#s2 .before div span{font:500 30px var(--body);color:var(--navy)}
+/* S3 challenges */
+#s3 .grid{position:absolute;left:36px;right:36px;top:214px;bottom:178px;display:grid;grid-template-columns:1fr 560px 1fr;gap:22px}
+#s3 .col{display:flex;flex-direction:column;gap:16px}
+.ccard{flex:1;display:flex;border:2px solid var(--line);border-radius:12px;background:#fff;overflow:hidden;text-align:left;padding:0;transition:border-color .25s,box-shadow .25s,transform .25s}
+.ccard:hover{border-color:#9fb0d0}
+.ccard.sel{border-color:var(--orange);box-shadow:0 0 0 4px rgba(224,78,27,.18);transform:scale(1.015)}
+.ccard .tx{flex:1;padding:12px 14px;display:flex;gap:12px;min-width:0}
+.ccard .ico{width:58px;height:58px}
+.ccard h3{margin:0 0 4px;font:700 25px/1.02 var(--head);color:var(--navy);text-transform:uppercase}
+.ccard p{margin:0;font:500 18px/1.28 var(--body);color:#2c3850}
+.ccard .im{width:150px;flex:0 0 150px}.ccard .im img{width:100%;height:100%;object-fit:cover}
+#cmap{border-radius:50%;overflow:hidden;border:5px solid var(--navy);align-self:center;width:560px;height:560px;position:relative;box-shadow:0 0 0 10px #e9eef8}
+#cmap .leaflet-control-attribution{font-size:9px}
+.cmark{width:34px;height:34px;border-radius:17px;background:var(--navy);color:#fff;border:3px solid #fff;font:700 17px/28px var(--body);text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.35);transition:transform .25s,background .25s}
+.cmark.sel{background:var(--orange);transform:scale(1.35)}
+#s3 .maplbl{position:absolute;left:50%;transform:translateX(-50%);top:868px;font:600 18px var(--body);color:var(--mute);white-space:nowrap}
+#s3 .msgbar{bottom:72px;height:94px;font-size:27px}
+#s3 .msgbar b{color:#ff8a5c;font:800 38px var(--head);white-space:nowrap}
+/* S4 study types */
+#s4 .lead{top:222px}
+#s4 .grid{position:absolute;left:72px;right:72px;top:330px;bottom:84px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;gap:24px}
+.scard{border:2px solid var(--line);border-radius:12px;background:#fff;overflow:hidden;display:flex;flex-direction:column;text-align:left;padding:0;transition:transform .3s,box-shadow .3s}
+.scard:hover{transform:translateY(-5px);box-shadow:0 16px 36px rgba(10,31,68,.16)}
+.scard .tx{display:flex;gap:18px;padding:16px 18px;min-height:150px}
+.scard .ico{width:80px;height:80px}
+.scard h3{margin:4px 0 6px;font:700 30px/1 var(--head);color:var(--navy);text-transform:uppercase}
+.scard p{margin:0;font:500 20px/1.3 var(--body);color:#2c3850}
+.scard .im{flex:1;min-height:0}.scard .im img{width:100%;height:100%;object-fit:cover}
+#sdet{position:absolute;inset:196px 0 0 0;background:rgba(244,246,250,.97);display:none;align-items:center;gap:56px;padding:0 90px;z-index:5}
+#sdet.on{display:flex;animation:pop .35s ease}
+@keyframes pop{from{opacity:0;transform:scale(.97)}}
+#sdet img{width:1000px;height:620px;object-fit:cover;border-radius:16px;box-shadow:0 20px 50px rgba(10,31,68,.25)}
+#sdet .ico{width:120px;height:120px;margin-bottom:26px}
+#sdet h2{margin:0 0 18px;font:800 64px/1 var(--head);color:var(--navy);text-transform:uppercase}
+#sdet p{margin:0;font:500 34px/1.38 var(--body);color:#2c3850}
+#sdet .x{position:absolute;right:50px;top:30px;border:0;background:var(--navy);color:#fff;width:56px;height:56px;border-radius:28px;font-size:30px}
+#sdet .nx{margin-top:34px;display:flex;gap:12px}
+#sdet .nx button{border:2px solid var(--navy);background:#fff;color:var(--navy);border-radius:28px;padding:10px 22px;font:600 22px var(--body)}
+/* S5 process */
+#s5 .band .st{font-style:normal;font-size:27px}#s5 .band h1{font-size:72px}
+#s5 .lead{top:218px;font-size:28px}
+#s5 .steps{position:absolute;left:56px;right:56px;top:336px;display:grid;grid-template-columns:repeat(7,1fr);gap:16px}
+.kstep{border:2px solid var(--line);border-radius:12px;background:#fff;padding:52px 10px 18px;position:relative;text-align:center;transition:all .3s;opacity:.55}
+.kstep.done{opacity:1}
+.kstep.cur{border-color:var(--c);box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 22%,transparent);opacity:1;transform:translateY(-6px)}
+.kstep .num{position:absolute;top:-24px;left:50%;transform:translateX(-50%);width:50px;height:50px;border-radius:25px;background:var(--c);color:#fff;font:700 30px/50px var(--body)}
+.kstep .ico{width:84px;height:84px;background:var(--c)}
+.kstep h3{margin:14px 0 0;font:700 22px/1.1 var(--head);color:var(--c);text-transform:uppercase;min-height:72px}
+.kstep:not(:last-child)::after{content:"";position:absolute;right:-15px;top:76px;border:9px solid transparent;border-left:12px solid var(--navy)}
+#kdet{position:absolute;left:56px;right:56px;top:636px;height:268px;display:flex;gap:40px;align-items:stretch}
+#kdet img{width:480px;height:268px;object-fit:cover;border-radius:14px}
+#kdet .tx{flex:1;display:flex;flex-direction:column;justify-content:center}
+#kdet .k{font:700 24px var(--body);color:var(--c);letter-spacing:.1em;text-transform:uppercase}
+#kdet h2{margin:4px 0 10px;font:800 50px/1 var(--head);color:var(--navy);text-transform:uppercase}
+#kdet p{margin:0;font:500 30px/1.32 var(--body);color:#2c3850}
+#kdet .pr{display:flex;gap:8px;margin-top:22px}#kdet .pr i{height:8px;flex:1;border-radius:4px;background:#dfe4ee}#kdet .pr i.on{background:var(--c)}
+#kdet.anim{animation:pop .35s ease}
+#s5 .msgbar{bottom:78px;height:88px;font-size:32px}#s5 .msgbar em{font-style:normal;color:#ff8a5c;margin:0 10px}
+/* S6 where to study */
+#s6 .lead{top:174px;font-size:31px}
+#s6 .steps{position:absolute;left:56px;right:56px;top:266px;display:grid;grid-template-columns:repeat(4,1fr);gap:40px}
+.wstep{border:2px solid var(--line);border-radius:14px;background:#fff;padding:16px 20px;position:relative;height:262px}
+.wstep:not(:last-child)::after{content:"";position:absolute;right:-30px;top:110px;border:12px solid transparent;border-left:16px solid var(--navy)}
+.wstep .hd{display:flex;gap:14px;align-items:center}
+.wstep .n{width:52px;height:52px;border-radius:26px;background:var(--c);color:#fff;font:700 32px/52px var(--body);text-align:center;flex:0 0 52px}
+.wstep h3{margin:0;font:700 25px/1.02 var(--head);color:var(--c);text-transform:uppercase}
+.wstep .ico{width:70px;height:70px;background:var(--c);margin:10px auto 8px;display:flex}
+.wstep p{margin:0;text-align:center;font:500 19px/1.28 var(--body);color:#2c3850}
+#s6 .low{position:absolute;left:56px;right:56px;top:552px;height:352px;display:grid;grid-template-columns:1.9fr 1fr;gap:28px}
+#s6 .wm{border:2px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;position:relative}
+#s6 .wm img{width:100%;height:100%;object-fit:cover;object-position:left center}
+#s6 .wm span{position:absolute;right:12px;top:12px;background:rgba(10,31,68,.85);color:#fff;font:600 17px var(--body);padding:5px 12px;border-radius:14px}
+#s6 .vt{background:var(--navy);color:#fff;border-radius:14px;padding:20px 28px}
+#s6 .vt .t{display:flex;align-items:baseline;gap:18px;border-bottom:2px solid #2a9ba5;padding-bottom:12px}
+#s6 .vt .t b{font:800 50px/1 var(--head);font-style:italic;color:#2ab3bf;letter-spacing:.02em}
+#s6 .vt .t span{font:600 20px/1.1 var(--body);color:#7fd3da;text-transform:uppercase}
+#s6 .vt p{margin:10px 0 6px;font:500 21px/1.28 var(--body)}
+#s6 .vt li{display:flex;align-items:center;gap:12px;margin-top:8px;font:500 19px/1.22 var(--body)}
+#s6 .vt ul{list-style:none;margin:0;padding:0}#s6 .vt .ico{width:44px;height:44px}
+#s6 .msgbar{bottom:70px;height:80px;font-size:26px}#s6 .msgbar .ico{width:62px;height:62px}
+/* S7 live map */
+#s7 .lead{top:166px;text-align:center;font-size:30px}
+#s7 .wrap{position:absolute;left:56px;right:56px;top:270px;bottom:182px;display:grid;grid-template-columns:1.25fr 1fr;gap:40px}
+#s7 .mapbox{border:2px solid #3c6e22;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;background:#eef3ea}
+#s7 .mh{background:#2f5a17;color:#fff;display:flex;align-items:center;gap:6px;padding:10px 12px}
+#s7 .mh button{flex:1;border:0;background:transparent;color:#cfe3c2;padding:10px 8px;border-radius:9px;font:700 21px var(--head);text-transform:uppercase;letter-spacing:.02em}
+#s7 .mh button.on{background:#fff;color:#2f5a17}
+#lmap{flex:1;position:relative}
+#lmap .lg{position:absolute;left:12px;bottom:12px;z-index:500;background:#fff;border-radius:10px;padding:10px 14px;font:500 17px/1.6 var(--body);box-shadow:0 2px 8px rgba(0,0,0,.2)}
+#lmap .lg b{display:block;font-weight:700}#lmap .lg i{display:inline-block;width:30px;height:5px;border-radius:3px;margin-right:8px;vertical-align:middle}
+#lmap .ld{position:absolute;inset:0;z-index:600;display:flex;align-items:center;justify-content:center;background:#eef3ea;font:600 22px var(--body);color:#2f5a17;text-align:center;padding:40px}
+#s7 .side{display:flex;flex-direction:column;justify-content:center;gap:26px}
+#s7 .pt{display:flex;gap:26px;align-items:center}
+#s7 .pt .ico{width:104px;height:104px;background:#2f5a17}
+#s7 .pt p{margin:0;font:600 29px/1.38 var(--body);color:#1f4a0e}
+#s7 hr{border:0;border-top:2px solid #2f5a17;margin:0}
+#s7 .stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+#s7 .stats div{background:var(--paper);border:2px solid var(--line);border-radius:12px;padding:14px 16px}
+#s7 .stats b{display:block;font:800 46px/1 var(--head);color:var(--navy)}
+#s7 .stats span{font:500 18px/1.25 var(--body);color:var(--mute)}
+#s7 .msgbar{bottom:72px;height:96px;font-size:28px}
+/* S8 demo */
+#s8{background:var(--navy)}
+#s8 .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center}
+#s8 h1{font:800 96px/1 var(--head);text-transform:uppercase;margin:0 0 20px}
+#s8 p{font:500 34px/1.4 var(--body);max-width:1300px;margin:0 0 40px;color:#d5def0}
+#s8 .go{border:0;background:var(--orange);color:#fff;font:700 36px var(--body);padding:22px 50px;border-radius:50px}
+#demo{position:fixed;inset:0;z-index:25;display:none;flex-direction:column;background:#fff}
+#demo.on{display:flex}
+#demo .top{height:46px;background:var(--navy);color:#fff;display:flex;align-items:center;gap:14px;padding:0 14px;font:600 16px var(--body)}
+#demo .top img{height:24px}#demo .top button{border:0;background:rgba(255,255,255,.15);color:#fff;border-radius:16px;padding:6px 14px;font:600 14px var(--body)}
+#demo .top .sp{flex:1}
+#demo iframe{flex:1;border:0;width:100%}
+/* S9 end */
+#s9{background:linear-gradient(135deg,#0b35a0,#0a1f44)}
+#s9 img{position:absolute;left:50%;top:250px;transform:translateX(-50%);width:760px}
+#s9 h1{position:absolute;left:0;right:0;top:560px;text-align:center;font:800 110px/1 var(--head);color:#fff;text-transform:uppercase;margin:0}
+#s9 p{position:absolute;left:0;right:0;top:700px;text-align:center;font:500 38px/1.5 var(--body);color:#d5def0;margin:0}
+/* ---------- data-problem slides ---------- */
+.sect{position:absolute;right:72px;top:62px;font:700 22px var(--body);color:#ffb08f;letter-spacing:.16em;text-transform:uppercase}
+.mm{position:relative;background:#e9edf3;overflow:hidden}
+.mm .leaflet-control-attribution{font-size:9px}
+.tag{display:inline-block;font:700 16px var(--body);padding:4px 10px;border-radius:6px;background:#e9eef8;color:var(--navy);margin-right:6px;white-space:nowrap}
+.tag.bad{background:#fde6dd;color:#a23a12}.tag.ok{background:#e3f1dc;color:#2f5a17}
+#d1 .lead{top:174px;font-size:30px}
+#d1 .gal{position:absolute;left:56px;right:56px;top:262px;bottom:190px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;gap:20px}
+.gcard{border:2px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;display:flex;flex-direction:column}
+.gcard .mm{flex:1;min-height:0}
+.gcard .cap{padding:10px 14px 12px}
+.gcard .src{font:700 15px var(--body);color:var(--orange);letter-spacing:.08em;text-transform:uppercase}
+.gcard h3{margin:2px 0 6px;font:700 24px/1.05 var(--head);color:var(--navy);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gcard p{margin:6px 0 0;font:500 18px/1.25 var(--body);color:#2c3850}
+#d1 .strip{position:absolute;left:56px;right:56px;bottom:74px;height:100px;display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+#d1 .strip div{background:var(--navy);color:#fff;border-radius:12px;padding:12px 16px;font:500 17px/1.3 var(--body)}
+#d1 .strip b{display:block;font:800 24px/1.05 var(--head);text-transform:uppercase;color:#ffb08f;margin-bottom:4px}
+/* d2 SYIP entry */
+#d2 .left{position:absolute;left:56px;top:176px;width:740px;bottom:84px;display:flex;flex-direction:column;gap:14px}
+#d2 .why{background:#fff8ef;border:2px solid #f3d3bd;border-radius:14px;padding:18px 22px;font:500 24px/1.38 var(--body);color:#3a2a1f}
+#d2 .why b{color:#a23a12}
+.case{display:flex;gap:16px;align-items:flex-start;border:2px solid var(--line);border-radius:12px;padding:12px 16px;background:#fff;opacity:.45;transition:all .35s}
+.case.cur{opacity:1;border-color:var(--orange);box-shadow:0 0 0 4px rgba(224,78,27,.15)}
+.case.done{opacity:.9}
+.case .n{flex:0 0 46px;height:46px;border-radius:23px;background:var(--navy);color:#fff;font:700 26px/46px var(--body);text-align:center}
+.case h3{margin:0 0 2px;font:700 27px/1.05 var(--head);color:var(--navy);text-transform:uppercase}
+.case p{margin:0;font:500 19px/1.3 var(--body);color:#2c3850}
+#d2map{position:absolute;left:830px;right:56px;top:176px;bottom:184px;border-radius:14px;border:2px solid var(--line)}
+#d2 .mcap{position:absolute;left:830px;right:56px;bottom:84px;height:86px;background:var(--navy);color:#fff;border-radius:12px;padding:12px 20px;font:500 21px/1.3 var(--body);display:flex;flex-direction:column;justify-content:center}
+#d2 .mcap b{font:700 23px var(--body);color:#ffb08f}
+.mleg{position:absolute;right:12px;top:12px;z-index:500;background:rgba(255,255,255,.95);border-radius:9px;padding:8px 12px;font:500 16px/1.6 var(--body);box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.mleg i{display:inline-block;width:26px;height:5px;border-radius:3px;margin-right:8px;vertical-align:middle}
+/* d3 buffer */
+#d3 .lead{top:174px;font-size:30px}
+#d3 .pair{position:absolute;left:56px;right:56px;top:262px;bottom:190px;display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.bcol{display:flex;flex-direction:column;border:2px solid var(--line);border-radius:14px;overflow:hidden;background:#fff}
+.bcol .hd{padding:12px 18px;display:flex;justify-content:space-between;align-items:center;background:var(--paper);border-bottom:2px solid var(--line)}
+.bcol h3{margin:0;font:700 28px/1 var(--head);color:var(--navy);text-transform:uppercase}
+.bcol .hd span{font:500 18px var(--body);color:var(--mute)}
+.bcol .mm{flex:1}
+.bcol .ct{display:flex;gap:0;border-top:2px solid var(--line)}
+.bcol .ct div{flex:1;padding:10px 14px;text-align:center;border-left:2px solid var(--line);opacity:.4;transition:opacity .3s}
+.bcol .ct div:first-child{border-left:0}.bcol .ct div.on{opacity:1;background:#fff8ef}
+.bcol .ct b{display:block;font:800 40px/1 var(--head);color:var(--navy)}.bcol .ct span{font:500 16px var(--body);color:var(--mute)}
+#d3 .bsel{position:absolute;left:50%;transform:translateX(-50%);top:224px;display:flex;gap:8px;z-index:3}
+#d3 .msgbar{bottom:72px;height:100px;font-size:27px}
+/* d4 uniform */
+#d4 .left{position:absolute;left:56px;top:176px;width:640px;bottom:84px;display:flex;flex-direction:column;gap:10px}
+.ustep{display:flex;gap:14px;align-items:center;border:2px solid var(--line);border-radius:12px;padding:10px 14px;background:#fff;opacity:.45;transition:all .35s;text-align:left}
+.ustep.cur{opacity:1;border-color:var(--orange);box-shadow:0 0 0 4px rgba(224,78,27,.15);transform:translateX(8px)}
+.ustep.done{opacity:.85}
+.ustep .n{flex:0 0 44px;height:44px;border-radius:22px;background:var(--green);color:#fff;font:700 24px/44px var(--body);text-align:center}
+.ustep h3{margin:0;font:700 25px/1.05 var(--head);color:var(--navy);text-transform:uppercase}
+.ustep p{margin:2px 0 0;font:500 17px/1.25 var(--body);color:#2c3850}
+#d4map{position:absolute;left:730px;right:56px;top:176px;bottom:214px;border-radius:14px;border:2px solid var(--line)}
+#d4 .mcap{position:absolute;left:730px;right:56px;bottom:84px;height:116px;background:var(--navy);color:#fff;border-radius:12px;padding:12px 22px;font:500 21px/1.32 var(--body);display:flex;flex-direction:column;justify-content:center}
+#d4 .mcap b{font:700 24px var(--body);color:#9fe07c}
+/* v1 VTrans */
+#v1{background:linear-gradient(180deg,#f4f6fa,#fbfcfe)}
+#v1 .lead{top:174px;font-size:29px}
+#v1 .flow{position:absolute;left:56px;right:56px;top:268px;display:grid;grid-template-columns:repeat(4,1fr);gap:34px}
+.vstep{background:#fff;border:2px solid var(--line);border-radius:14px;padding:18px 20px;position:relative;min-height:330px}
+.vstep:not(:last-child)::after{content:"";position:absolute;right:-28px;top:44%;border:12px solid transparent;border-left:16px solid var(--navy)}
+.vstep .n{display:inline-block;font:800 54px/1 var(--head);color:#2ab3bf}
+.vstep h3{margin:4px 0 10px;font:700 30px/1.02 var(--head);color:var(--navy);text-transform:uppercase}
+.vstep p{margin:0;font:500 20px/1.35 var(--body);color:#2c3850}
+.vstep .mk{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px}
+.vstep .mk span{font:600 15px var(--body);padding:4px 9px;border-radius:6px;background:#e6f4f5;color:#0f6b73}
+#v1 .cats{position:absolute;left:56px;right:56px;top:636px;display:grid;grid-template-columns:1.3fr 1.6fr 1fr 1fr;gap:16px}
+#v1 .cats div{background:var(--navy);border-radius:12px;padding:12px 16px;color:#dfe7f5;font:500 17px/1.4 var(--body)}
+#v1 .cats b{display:block;font:700 22px/1.1 var(--head);text-transform:uppercase;color:#7fd3da;margin-bottom:6px}
+#v1 .msgbar{bottom:66px;height:84px;font-size:25px}
+/* demo intro + use cases */
+#uc .lead{top:174px;font-size:30px}
+#uc .grid{position:absolute;left:56px;right:56px;top:262px;bottom:84px;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:1fr 1fr;gap:20px}
+.ucard{background:#fff;border:2px solid var(--line);border-radius:14px;padding:20px 22px;display:flex;flex-direction:column;gap:10px}
+.ucard .ico{width:72px;height:72px}
+.ucard h3{margin:0;font:700 29px/1.02 var(--head);color:var(--navy);text-transform:uppercase}
+.ucard p{margin:0;font:500 19px/1.35 var(--body);color:#2c3850}
+.ucard.next{background:#fff8ef;border-color:#f3d3bd}.ucard.next h3{color:#a23a12}
+/* demo overlay with captions */
+#demo .top{display:none}
+#demo iframe{flex:1}
+#dcap{height:84px;background:#0a1f44;color:#fff;display:flex;align-items:center;gap:18px;padding:0 18px;font-family:var(--body);flex:0 0 auto;border-top:3px solid var(--orange)}
+#dcap .ch{font:700 13px var(--body);letter-spacing:.14em;text-transform:uppercase;color:#ffb08f;white-space:nowrap}
+#dcap h4{margin:0;font:700 22px/1.15 var(--head);text-transform:uppercase;letter-spacing:.02em}
+#dcap p{margin:2px 0 0;font:500 16px/1.3 var(--body);color:#d5def0}
+#dcap .tx{flex:1;min-width:0}
+#dcap .ctl{display:flex;align-items:center;gap:8px}
+#dcap .ctl button{border:0;background:rgba(255,255,255,.14);color:#fff;width:44px;height:44px;border-radius:22px;font-size:22px}
+#dcap .ctl span{font:600 14px var(--body);color:#b8c6dc;min-width:60px;text-align:center}
+#dcap img{height:34px}
+#demo.nocap #dcap{display:none}
+#blank{position:fixed;inset:0;background:#000;z-index:60;display:none}#blank.on{display:block}
+</style></head><body>
+<div id="viewport"><div id="stage">
+
+<!-- 1 TITLE -->
+<section class="slide" id="s1" data-title="Title">
+  <img class="logo" src="assets/vdot.png" alt="VDOT - Virginia Department of Transportation">
+  <div class="eyebrow">ODU GIS Day 2026</div>
+  <h1>Visualizing Needs and Investments: A Dashboard Approach to Regional Planning</h1>
+  <div class="names">Saurav Parajuli<br>Keisha Wilkins</div>
+  <div class="date">November 18, 2026</div>
+  <div class="hint">Press &rarr; or space to begin &middot; F for full screen &middot; O for all slides</div>
+</section>
+
+<!-- 2 PLANNING -->
+<section class="slide" id="s2" data-title="Projects start with planning" data-steps="1">
+  <div class="band"><div class="tt"><h1>Transportation projects start<br>with planning</h1></div><div class="ph"><img src="assets/hero.jpg" alt=""></div></div>
+  <div class="lead">When people think about transportation projects, they often think about the construction underway or a newly completed construction project.</div>
+  <div class="cards">
+    <div class="pcard"><div class="hd"><span class="ico" data-i="road"></span>A new road or wider road</div><div class="im"><img src="assets/p_road.jpg" alt="Divided highway"></div></div>
+    <div class="pcard"><div class="hd"><span class="ico" data-i="round"></span>A roundabout or another innovative intersection</div><div class="im"><img src="assets/p_round.jpg" alt="Roundabout"></div></div>
+    <div class="pcard"><div class="hd"><span class="ico" data-i="walkbike"></span>A sidewalk or a trail</div><div class="im"><img src="assets/p_trail.jpg" alt="Sidewalk and trail"></div></div>
+  </div>
+  <div class="before frag" data-f="1"><span class="ico" data-i="clip"></span><div><b>But before any of those projects are funded or constructed,</b><span>there is a significant planning process that takes place.</span></div></div>
+  <div class="foot"><img src="assets/vdot_small.png" alt=""><i></i>Virginia Department of Transportation<span class="pn"></span></div>
+</section>
+
+<!-- 3 CHALLENGES -->
+<section class="slide" id="s3" data-title="Hampton Roads challenges">
+  <div class="band"><div class="tt"><h1>Hampton Roads<br>transportation challenges</h1><div class="st">Planning for one of Virginia's most complex transportation environments</div></div><div class="ph"><img src="assets/hero2.jpg" alt=""></div></div>
+  <div class="grid">
+    <div class="col">
+      <button class="ccard" data-c="0"><div class="tx"><span class="ico" data-i="anchor"></span><div><h3>1. Major military installations</h3><p>Naval Station Norfolk, Joint Base Langley-Eustis, and other defense facilities require dependable mobility and freight access.</p></div></div><div class="im"><img src="assets/c_mil.jpg" alt=""></div></button>
+      <button class="ccard" data-c="2"><div class="tx"><span class="ico" data-i="city"></span><div><h3>3. Urban and rural areas</h3><p>Dense population centers, suburban communities, and rural areas require efficient commuter travel, transit, congestion management, and regional connectivity.</p></div></div><div class="im"><img src="assets/c_urban.jpg" alt=""></div></button>
+      <button class="ccard" data-c="4"><div class="tx"><span class="ico" data-i="umbrella"></span><div><h3>5. Tourism destinations</h3><p>Virginia Beach, historic attractions, waterfronts, and seasonal events generate significant travel demand.</p></div></div><div class="im"><img src="assets/c_tour.jpg" alt=""></div></button>
+    </div>
+    <div id="cmap"></div>
+    <div class="col">
+      <button class="ccard" data-c="1"><div class="tx"><span class="ico" data-i="ship"></span><div><h3>2. International shipping facilities</h3><p>The Port of Virginia serves global commerce through major marine terminals and freight corridors.</p></div></div><div class="im"><img src="assets/c_port.jpg" alt=""></div></button>
+      <button class="ccard" data-c="3"><div class="tx"><span class="ico" data-i="bridge"></span><div><h3>4. Tunnels &amp; bridges</h3><p>Critical bridge and tunnel crossings connect communities, support freight movement, enable military access, and provide regional mobility across waterways.</p></div></div><div class="im"><img src="assets/c_tunnel.jpg" alt=""></div></button>
+      <button class="ccard" data-c="5"><div class="tx"><span class="ico" data-i="siren"></span><div><h3>6. Critical evacuation routes</h3><p>Roadways must accommodate emergency operations and large-scale evacuations during hurricanes and severe weather.</p></div></div><div class="im"><img src="assets/c_evac.jpg" alt=""></div></button>
+    </div>
+  </div>
+  <div class="maplbl">Click a challenge or a map marker</div>
+  <div class="msgbar"><b>Key message</b><span style="width:3px;height:56px;background:var(--orange)"></span><span>One transportation network must simultaneously support military readiness, global commerce, daily travel, tourism, rural access, and emergency preparedness.</span></div>
+  <div class="foot"><img src="assets/vdot_small.png" alt=""><i></i>Virginia Department of Transportation<span class="pn"></span></div>
+</section>
+
+<!-- 4 STUDY TYPES -->
+<section class="slide" id="s4" data-title="Transportation study types">
+  <div class="band"><div class="tt" style="padding-top:52px"><h1>Transportation study types</h1></div><div class="ph"><img src="assets/hero.jpg" alt=""></div></div>
+  <div class="lead">Different types of transportation studies help identify needs, evaluate options, and guide smart investments across Hampton Roads.</div>
+  <div class="grid" id="sgrid"></div>
+  <div id="sdet"><button class="x" aria-label="Close">&times;</button><img alt=""><div><span class="ico"></span><h2></h2><p></p><div class="nx"><button data-d="-1">&larr; Previous</button><button data-d="1">Next &rarr;</button></div></div></div>
+  <div class="foot"><img src="assets/vdot_small.png" alt=""><i></i>Virginia Department of Transportation<span class="hint" style="margin-left:30px">Click a study type to open it</span><span class="pn"></span></div>
+</section>
+
+<!-- 5 PROCESS -->
+<section class="slide" id="s5" data-title="The study process" data-steps="7">
+  <div class="band"><div class="tt"><h1>The transportation study process</h1><div class="st">A systematic approach to developing solutions that meet<br>today's needs and prepare for tomorrow.</div></div><div class="ph"><img src="assets/hero3.jpg" alt=""></div></div>
+  <div class="lead">Transportation studies follow a proven process that ensures data-driven decisions, meaningful public engagement, and practical recommendations.</div>
+  <div class="steps" id="ksteps"></div>
+  <div id="kdet"></div>
+  <div class="msgbar"><span class="ico" data-i="check"></span><span>A clear process. Better decisions. Stronger communities.<em>|</em>Planning today for a better transportation future.</span></div>
+  <div class="foot"><img src="assets/vdot_small.png" alt=""><i></i>Virginia Department of Transportation<span class="pn"></span></div>
+</section>
+
+<!-- 6 WHERE TO STUDY -->
+<section class="slide" id="s6" data-title="Where to conduct a study" data-steps="4">
+  <div class="band slim"><div class="tt"><h1 style="font-size:60px">How transportation planners determine<br>where to conduct a study</h1></div></div>
+  <div class="lead">We use data, plans, and collaboration to identify the highest needs and opportunities across Hampton Roads and throughout the Commonwealth.</div>
+  <div class="steps">
+    <div class="wstep frag" data-f="1" style="--c:#0a1f44"><div class="hd"><span class="n">1</span><h3>Monitor needs and conditions</h3></div><span class="ico" data-i="chartsearch"></span><p>Track data on traffic, safety, congestion, infrastructure, and system performance.</p></div>
+    <div class="wstep frag" data-f="2" style="--c:#3f7a1d"><div class="hd"><span class="n">2</span><h3>Use VTrans and other planning data</h3></div><span class="ico" data-i="monitor"></span><p>Analyze VTrans priorities, corridor studies, traffic data, and other planning resources to identify transportation needs and opportunities.</p></div>
+    <div class="wstep frag" data-f="3" style="--c:#0a1f44"><div class="hd"><span class="n">3</span><h3>Engage local leaders and communities</h3></div><span class="ico" data-i="users"></span><p>Collaborate with local governments, community leaders, stakeholders, and the public to understand local needs, concerns, and priorities.</p></div>
+    <div class="wstep frag" data-f="4" style="--c:#e04e1b"><div class="hd"><span class="n">4</span><h3>Review past studies, TPO studies, and plans</h3></div><span class="ico" data-i="docsearch"></span><p>Review previous transportation studies, TPO planning efforts, comprehensive plans, and regional initiatives to identify recommendations, gaps, and opportunities for future study.</p></div>
+  </div>
+  <div class="low">
+    <div class="wm"><img src="assets/webmap.jpg" alt="VTrans prioritized needs web map"><span>VTrans web map</span></div>
+    <div class="vt"><div class="t"><b>VTRANS</b><span>Virginia's<br>transportation plan</span></div>
+      <p>VTrans is Virginia's long-range multimodal transportation plan.</p>
+      <ul><li><span class="ico" data-i="chart" style="background:#3f7a1d"></span>Identifies the state's most significant transportation needs.</li>
+      <li><span class="ico" data-i="users" style="background:#178a97"></span>Prioritizes needs based on data, performance, and policy goals.</li>
+      <li><span class="ico" data-i="target" style="background:#7b3aa6"></span>Guides investment decisions and helps determine where studies are needed.</li></ul></div>
+  </div>
+  <div class="msgbar"><span class="ico" data-i="check"></span><span>By using objective data, proven planning tools like VTrans, and strong partnerships, we focus studies where they will make the biggest difference for our communities.</span></div>
+  <div class="foot"><img src="assets/vdot_small.png" alt=""><i></i>Virginia Department of Transportation<span class="pn"></span></div>
+</section>
+
+<!-- 7 VTRANS WEBMAP CHALLENGE (live) -->
+<section class="slide" id="s7" data-title="Challenges with the VTrans web map" data-steps="2">
+  <div class="band slim" style="height:120px"><div class="tt" style="padding-top:22px"><h1 style="text-transform:none">Challenges with the VTrans Webmap</h1></div></div>
+  <div class="lead">The VTrans webmap is a powerful tool for identifying transportation needs; however, it does not provide information on studies and projects that are planned, underway, or completed.</div>
+  <div class="wrap">
+    <div class="mapbox">
+      <div class="mh"><button data-m="0" class="on">What the map shows</button><button data-m="1">+ Projects &amp; studies</button><button data-m="2">Where the gaps are</button></div>
+      <div id="lmap"><div class="lg" id="lleg"></div><div class="ld" id="lload">Loading Hampton Roads data ...</div></div>
+    </div>
+    <div class="side">
+      <div class="pt"><span class="ico" data-i="bulb"></span><p>To make informed decisions, we must look at prioritized needs alongside planned, underway, and completed projects.</p></div>
+      <hr>
+      <div class="pt"><span class="ico" data-i="users"></span><p>Combining needs data with project information gives us the full picture&mdash;helping us invest where it's needed most and avoid duplicating planned improvements.</p></div>
+      <div class="stats" id="lstats"></div>
+    </div>
+  </div>
+  <div class="msgbar"><span class="ico" data-i="bulb"></span><span>Combining needs data with project information gives us the full picture&mdash;helping us invest where it's needed most and avoid duplicating planned improvements.</span></div>
+  <div class="foot"><img src="assets/vdot_small.png" alt=""><i></i>Virginia Department of Transportation<span class="hint" style="margin-left:30px">Hampton Roads district &middot; VTrans 2025 mid-term needs, district priority</span><span class="pn"></span></div>
+</section>
+
+<!-- D1 SHAPES -->
+<section class="slide" id="d1" data-title="Five sources, many shapes">
+  <div class="band slim"><div class="tt"><h1>Five sources, many shapes</h1></div></div>
+  <div class="sect">Bringing projects onto the needs map</div>
+  <div class="lead">To compare projects with VTrans needs, every record has to land on the same roads. Here is how the same kind of information actually arrives.</div>
+  <div class="gal">
+    <div class="gcard"><div class="mm" id="g1"></div><div class="cap"><div class="src">SYIP line</div><h3>Mercury Blvd Pedestrian Improvements</h3><span class="tag ok">Line on the LRS</span><span class="tag">32 vertices</span></div></div>
+    <div class="gcard"><div class="mm" id="g2"></div><div class="cap"><div class="src">SYIP cluster point</div><h3>Elizabeth River Trail, Phase 3a</h3><span class="tag bad">No line published</span><span class="tag">1 point</span></div></div>
+    <div class="gcard"><div class="mm" id="g3"></div><div class="cap"><div class="src">SMART SCALE FY2024</div><h3>Military Hwy Safety &amp; Access Mgmt</h3><span class="tag bad">Polygon 2 ft wide</span><span class="tag">a line in disguise</span></div></div>
+    <div class="gcard"><div class="mm" id="g4"></div><div class="cap"><div class="src">SMART SCALE FY2020</div><h3>Mooretown Rd / Lightfoot Rd</h3><span class="tag bad">Polygon 300 ft wide</span><span class="tag">a blob</span></div></div>
+    <div class="gcard"><div class="mm" id="g5"></div><div class="cap"><div class="src">STARS study</div><h3>Mercury Boulevard (Route 258)</h3><span class="tag bad">Stored as lines</span><span class="tag">closed polygon outline</span></div></div>
+    <div class="gcard"><div class="mm" id="g6"></div><div class="cap"><div class="src">Pathways to Planning</div><h3>I-64 at J. Clyde Morris Blvd</h3><span class="tag bad">Only a lat / long</span><span class="tag">study as a point</span></div></div>
+  </div>
+  <div class="strip">
+    <div><b>SYIP</b>2,682 lines plus 234 points in a separate file</div>
+    <div><b>SMART SCALE</b>Polygons in FY17&ndash;FY26, but closed lines in FY22 (397)</div>
+    <div><b>STARS</b>All 148 studies stored as closed lines</div>
+    <div><b>Pathways</b>Lines, multilines, points, multipoints and collections</div>
+    <div><b>AMP</b>Lines, one plan split across many pieces</div>
+  </div>
+  <div class="foot"><img src="assets/vdot_small.png" alt=""><i></i>Virginia Department of Transportation<span class="hint" style="margin-left:30px">Statewide counts from the source files; maps are real Hampton Roads records</span><span class="pn"></span></div>
+</section>
+
+<!-- D2 SYIP ENTRY -->
+<section class="slide" id="d2" data-title="Why SYIP locations vary" data-steps="4">
+  <div class="band slim"><div class="tt"><h1>Why SYIP locations vary</h1></div></div>
+  <div class="sect">Bringing projects onto the needs map</div>
+  <div class="left">
+    <div class="why">Project managers enter each location. <b>Forcing the LRS</b> would block projects on roads that do not exist yet, so they can also <b>draw by hand</b>, and some drawings are fine while others are coarse.</div>
+    <div class="case" data-c="1"><span class="n">1</span><div><h3>Snapped to the LRS</h3><p>373 of 402 Hampton Roads SYIP lines sit exactly on the road centerline.</p></div></div>
+    <div class="case" data-c="2"><span class="n">2</span><div><h3>No centerline to snap to</h3><p>The road is not in the LRS layer, so the line is drawn by hand.</p></div></div>
+    <div class="case" data-c="3"><span class="n">3</span><div><h3>Coarse sketch</h3><p>A quick straight line, about 200 ft off the road it describes.</p></div></div>
+    <div class="case" data-c="4"><span class="n">4</span><div><h3>Default placeholders</h3><p>The whole route instead of the project: 35 lines in Hampton Roads, 24 point-only, 59 areawide.</p></div></div>
+  </div>
+  <div class="mm" id="d2map"><div class="mleg" id="d2leg"></div></div>
+  <div class="mcap" id="d2cap"></div>
+  <div class="foot"><img src="assets/vdot_small.png" alt=""><i></i>Virginia Department of Transportation<span class="pn"></span></div>
+</section>
+
+<!-- D3 BUFFER -->
+<section class="slide" id="d3" data-title="One buffer does not fit all" data-steps="3">
+  <div class="band slim"><div class="tt"><h1>One buffer does not fit all</h1></div></div>
+  <div class="sect">Bringing projects onto the needs map</div>
+  <div class="lead">Snapping projects to VTrans needs with a buffer works for one drawing style and breaks another.</div>
+  <div class="pair">
+    <div class="bcol"><div class="hd"><h3>Fine drawing</h3><span>#HB2.FY17 Longhill Rd Widening</span></div><div class="mm" id="b1"></div>
+      <div class="ct" id="b1c"></div></div>
+    <div class="bcol"><div class="hd"><h3>Coarse sketch</h3><span>Signal Retiming Improvements</span></div><div class="mm" id="b2"></div>
+      <div class="ct" id="b2c"></div></div>
+  </div>
+  <div class="msgbar"><span class="ico" data-i="bulb"></span><span id="d3msg">Each click widens the buffer: 50 ft, then 250 ft, then 750 ft. The numbers count the VTrans need segments it captures.</span></div>
+  <div class="foot"><img src="assets/vdot_small.png" alt=""><i></i>Virginia Department of Transportation<span class="pn"></span></div>
+</section>
+
+<!-- D4 UNIFORM -->
+<section class="slide" id="d4" data-title="How we made it uniform" data-steps="6">
+  <div class="band slim"><div class="tt"><h1>How we made the data uniform</h1></div></div>
+  <div class="sect">Bringing projects onto the needs map</div>
+  <div class="left" id="d4steps"></div>
+  <div class="mm" id="d4map"><div class="mleg" id="d4leg"></div></div>
+  <div class="mcap" id="d4cap"></div>
+  <div class="foot"><img src="assets/vdot_small.png" alt=""><i></i>Virginia Department of Transportation<span class="hint" style="margin-left:30px">One Python run rebuilds everything when a new SYIP or SMART SCALE release arrives</span><span class="pn"></span></div>
+</section>
+
+<!-- V1 VTRANS -->
+<section class="slide" id="v1" data-title="2025 VTrans Prioritized Mid-term Needs" data-steps="4">
+  <div class="band slim"><div class="tt"><h1 style="font-size:62px">2025 VTrans Prioritized Mid-term Needs</h1></div></div>
+  <div class="lead">VTrans identifies the needs Virginia should address over the next ten years, then ranks locations in four steps.</div>
+  <div class="flow">
+    <div class="vstep frag" data-f="1"><span class="n">1</span><h3>Define geographic levels</h3><p><b>Statewide:</b> Corridors of Statewide Significance and Safety.<br><b>Construction District:</b> CoSS, Regional Networks, Safety and UDA (IEDA access).</p></div>
+    <div class="vstep frag" data-f="2"><span class="n">2</span><h3>Prioritize within each need</h3><p>Every need is rated Low, Medium, High or Very High from its severity and the number of users affected.</p><div class="mk"><span>Congestion</span><span>Reliability</span><span>Safety</span><span>Ped / bike access</span><span>Transit</span></div></div>
+    <div class="vstep frag" data-f="3"><span class="n">3</span><h3>Weigh and add them up</h3><p>Category ratings are weighted and combined into one priority score for each location.</p><div class="mk"><span>Priority score</span></div></div>
+    <div class="vstep frag" data-f="4"><span class="n">4</span><h3>Adjust for influencing factors</h3><p>Bridge and pavement condition, flooding and sea-level-rise exposure, and economically distressed communities adjust the score, which sets <b>Priority 1 to 4</b>.</p><div class="mk"><span>Adjusted score</span><span>Priority 1&ndash;4</span></div></div>
+  </div>
+  <div class="cats">
+    <div><b>Corridors of Statewide Significance</b>Congestion &middot; Reliability &middot; Rail on-time &middot; Capacity preservation &middot; Travel demand management</div>
+    <div><b>Regional Networks</b>Congestion &middot; Reliability &middot; Capacity preservation &middot; TDM &middot; Transit access &middot; Bicycle access &middot; Pedestrian access &middot; Transit equity</div>
+    <div><b>Safety</b>Segments (district and statewide) &middot; Pedestrian safety</div>
+    <div><b>UDA</b>Access to Industrial and Economic Development Areas</div>
+  </div>
+  <div class="msgbar"><span class="ico" data-i="target"></span><span>Projects that address these needs can compete for SMART SCALE funding, and top-priority locations become eligible for Project Pipeline studies.</span></div>
+  <div class="foot"><img src="assets/vdot_small.png" alt=""><i></i>Virginia Department of Transportation<span class="hint" style="margin-left:30px">Source: VTrans Policy Guide and vtrans.virginia.gov; data file prioritized_needs_2025.gdb</span><span class="pn"></span></div>
+</section>
+
+<!-- 8 LIVE DEMO -->
+<section class="slide" id="s8" data-title="Live demo: Priority Explorer">
+  <div class="c"><img src="assets/vdot_white.png" alt="VDOT" style="width:300px;margin-bottom:40px"><h1>A dashboard approach</h1>
+  <p>The Priority Explorer puts the 2025 VTrans needs, SYIP, SMART SCALE, STARS and planning studies on one map, so a click on any road or place shows its priorities and every project there.</p>
+  <button class="go" id="godemo">Start the live demo &rarr;</button>
+  <p class="hint" style="color:#9fb0d0;margin-top:26px">The clicker keeps working inside the demo: next and back step through each view</p></div>
+</section>
+
+<!-- LIVE DEMO (scenes driven by the clicker) -->
+<section class="slide" id="demo-s" data-title="Live demo" data-demo="1">
+  <div class="c" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--navy);color:#fff;font:600 40px var(--body)">Loading the Priority Explorer ...</div>
+</section>
+
+<!-- USE CASES -->
+<section class="slide" id="uc" data-title="What the app is for">
+  <div class="band slim"><div class="tt"><h1>What the app is for</h1></div></div>
+  <div class="lead">One place to see what VTrans says a location needs, and what has already been planned, built or studied there.</div>
+  <div class="grid">
+    <div class="ucard"><span class="ico" data-i="pin"></span><h3>Answer a locality fast</h3><p>Circle the location: priorities, needs and every past and planned project in seconds.</p></div>
+    <div class="ucard"><span class="ico" data-i="doc"></span><h3>Reuse past studies</h3><p>A completed STARS or Pathways study means data, outreach and early engineering already exist.</p></div>
+    <div class="ucard"><span class="ico" data-i="map"></span><h3>Shape a new idea</h3><p>Draw the area to see which needs a project should target before it is scoped.</p></div>
+    <div class="ucard"><span class="ico" data-i="search"></span><h3>Find the gaps</h3><p>Priority 1&ndash;2 roads with no project yet point to the next Project Pipeline or STARS candidates.</p></div>
+    <div class="ucard"><span class="ico" data-i="modes"></span><h3>Check multimodal needs</h3><p>Compare pedestrian, bicycle and transit needs with the bike/ped and transit projects in place.</p></div>
+    <div class="ucard"><span class="ico" data-i="check"></span><h3>Avoid duplication</h3><p>See what is planned or underway before starting another study on the same corridor.</p></div>
+    <div class="ucard"><span class="ico" data-i="chart"></span><h3>Prepare for meetings</h3><p>Filter, sort and download the project list as a spreadsheet for any district or the whole state.</p></div>
+    <div class="ucard next"><span class="ico" data-i="bulb" style="background:#a23a12"></span><h3>Next: better data at the source</h3><p>Location-confidence flags show which SYIP records PMs could fix, and every new release rebuilds in one run.</p></div>
+  </div>
+  <div class="foot"><img src="assets/vdot_small.png" alt=""><i></i>Virginia Department of Transportation<span class="pn"></span></div>
+</section>
+
+<!-- 9 END -->
+<section class="slide" id="s9" data-title="Thank you">
+  <img src="assets/vdot_white.png" alt="VDOT">
+  <h1>Thank you</h1>
+  <p>Saurav Parajuli &middot; Keisha Wilkins<br>Questions?</p>
+</section>
+
+</div></div>
+<div id="demo"><iframe title="Priority Explorer" id="demof"></iframe><div id="dcap"><img src="assets/vdot_white.png" alt="VDOT"><div class="ch"></div><div class="tx"><h4></h4><p></p></div><div class="ctl"><button id="dprev" aria-label="Back">&lsaquo;</button><span></span><button id="dnext" aria-label="Next">&rsaquo;</button></div></div></div>
+<div id="blank"></div>
+<div id="overview"></div>
+<div id="bar"></div>
+<div id="help">&larr; &rarr; move &middot; F full screen &middot; O all slides</div>
+<div id="nav"><button id="prev" aria-label="Previous">&lsaquo;</button><span id="cnt"></span><button id="next" aria-label="Next">&rsaquo;</button><button id="fs" aria-label="Full screen">&#x26F6;</button></div>
+
+<script src="assets/examples.js"></script>
+<script>
+const EXPLORER='explorer/index.html', HR_DATA='explorer/explorer_data/hampton_roads.js';
+// ---------- icons (simple line icons)
+const I={
+road:'<path d="M8 3 4 21M16 3l4 18M12 5v3M12 11v3M12 17v3"/>',
+round:'<path d="M20 12a8 8 0 0 1-12.9 6.3M4 12a8 8 0 0 1 12.9-6.3"/><path d="M17 2.5v4h-4M7 21.5v-4h4"/>',
+walkbike:'<circle cx="7" cy="4" r="1.6"/><path d="M5 21l2-6 2.5 2V21M7 15l1-5 3 3h2M8 10 5 12v3"/><circle cx="16" cy="18" r="3"/><circle cx="21.5" cy="18" r="0"/><path d="M16 18l2-5h3M18 13l-1.5-2"/>',
+clip:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.5h6V4M8 10l1.2 1.2L11.5 9M8 15l1.2 1.2 2.3-2.2M13.5 10H16M13.5 15H16"/>',
+anchor:'<circle cx="12" cy="5" r="2.2"/><path d="M12 7.2V21M8 11h8M4 13a8 8 0 0 0 16 0M4 13H2.5M20 13h1.5"/>',
+ship:'<path d="M3 15l2 5h14l2-5-9-3z"/><path d="M6 13V8h12v5M9 8V5h6v3M2 21c2 1 4 1 6 0 2 1 4 1 6 0 2 1 4 1 6 0"/>',
+city:'<path d="M3 21V9l5-3v15M8 21V4h7v17M15 21V10h6v11M2 21h20M11 8h1M11 11h1M11 14h1M18 13h1M18 16h1"/>',
+bridge:'<path d="M2 12h20M5 12V5M19 12V5M5 5c3 4 11 4 14 0M5 12c2-3 12-3 14 0M8 12v5M16 12v5M2 20c2 1 4 1 6 0 2 1 4 1 6 0 2 1 4 1 6 0"/>',
+umbrella:'<path d="M3 11a9 9 0 0 1 18 0zM12 2v1M12 11v7a2 2 0 0 0 4 0"/><path d="M2 21c2 1 4 1 6 0 2 1 4 1 6 0 2 1 4 1 6 0"/>',
+siren:'<path d="M7 18v-6a5 5 0 0 1 10 0v6M5 21h14v-3H5zM12 2v2M4.2 5.2l1.4 1.4M19.8 5.2l-1.4 1.4M2 12h2M20 12h2"/>',
+map:'<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
+clipcheck:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.5h6V4M8 11h5M8 15h3"/><circle cx="16" cy="16" r="3.4"/><path d="M14.6 16l1 1 1.8-1.8"/>',
+modes:'<rect x="3" y="12" width="8" height="7" rx="2"/><path d="M4.5 19v1.5M9.5 19v1.5M3 15.5h8"/><circle cx="17" cy="4" r="1.5"/><path d="M16 21l1-5 2 2v3M17 16l.6-5 2.4 2M17.6 11 15 13"/>',
+pipeline:'<path d="M7 21V3h6a5 5 0 0 1 0 10H7"/><circle cx="5" cy="13" r="1.6"/>',
+stars:'<path d="M12 3l2.6 5.5 6 .8-4.4 4.1 1.1 5.9L12 16.4 6.7 19.3l1.1-5.9L3.4 9.3l6-.8z"/>',
+search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5.5 5.5"/>',
+chart:'<path d="M4 20V10M10 20V4M16 20v-8M21 20H3"/>',
+chartsearch:'<circle cx="10.5" cy="10.5" r="7"/><path d="m15.8 15.8 5.2 5.2M8 13V10M10.5 13V7.5M13 13v-4"/>',
+users:'<circle cx="9" cy="7" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="8" r="2.5"/><path d="M16 13.2a5 5 0 0 1 6 5"/>',
+bulb:'<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2h5c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/>',
+doc:'<path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
+docsearch:'<path d="M13 3H5v18h7M13 3v4h4v4"/><circle cx="16" cy="16" r="3.5"/><path d="m18.5 18.5 2.5 2.5M8 9h3M8 13h2"/>',
+monitor:'<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4M7 12l3-3 2 2 4-4"/>',
+target:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="m12 12 8-8M16 4h4v4"/>',
+check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+pin:'<path d="M12 21s7-6.3 7-12a7 7 0 0 0-14 0c0 5.7 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>',
+cost:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M8 15h2M12 15h4M8 18h8"/>',
+build:'<path d="M8 3 4 21M16 3l4 18M12 5v3M12 11v3M12 17v3"/>'};
+const icon=n=>`<svg viewBox="0 0 24 24" aria-hidden="true">${I[n]||''}</svg>`;
+const fillIcons=root=>root.querySelectorAll('.ico[data-i]').forEach(e=>{e.innerHTML=icon(e.dataset.i)});
+
+// ---------- slide 4 data
+const STUDY=[
+ ['map','Arterial preservation plans','Identify and protect long-term corridors needed for future transportation improvements.','s_amp'],
+ ['road','Corridor studies','Evaluate existing and future conditions along a corridor to identify needs and recommend improvements.','s_corr'],
+ ['clipcheck','Feasibility studies','Assess the practicality, benefits, and potential impacts of proposed transportation solutions.','s_feas'],
+ ['modes','Multimodal studies','Evaluate transportation needs and solutions for all modes, including pedestrians, bicycles, transit, and vehicles.','s_multi'],
+ ['pipeline','Project Pipeline studies','Identify, evaluate, and prioritize potential projects to build a pipeline of investments for the future.','s_pipe'],
+ ['stars','STARS studies',"Use data-driven analysis to evaluate safety, operations, and multimodal improvements on Hampton Roads' major roadways.",'s_stars']];
+// ---------- slide 5 data
+const STEPS=[
+ ['search','#0a1f44','Define the need and study area','Identify the transportation problem or opportunity, establish goals and objectives, and define the study area.','k1'],
+ ['chart','#3f7a1d','Collect data and existing conditions','Gather data on traffic, safety, infrastructure, land use, environment, and community conditions.','k2'],
+ ['users','#0a1f44','Engage the community','Involve the public, local stakeholders, and partners to understand needs, values, and priorities.','k3'],
+ ['bulb','#e04e1b','Develop and evaluate alternatives','Identify and assess a range of solutions based on safety, mobility, environmental impacts, feasibility, and cost.','k4'],
+ ['clipcheck','#5b2a86','Select the preferred alternative and develop cost estimates','Select the preferred alternative that best meets the study goals and community needs and develop cost estimates.','k5'],
+ ['doc','#0f6b73','Document the study','Prepare a study report that documents findings, outreach, analyses, and recommendations.','k6'],
+ ['road','#0a1f44','Pursue funding to construct preferred alternative','Use study findings to inform planning, secure funding, and advance projects into design and construction.','k7']];
+// ---------- slide 3 places (approximate locations)
+const PLACES=[[0,'Naval Station Norfolk',36.946,-76.309],[0,'Joint Base Langley-Eustis',37.083,-76.360],[1,'Port of Virginia terminals',36.905,-76.330],[1,'Virginia International Gateway',36.868,-76.366],
+ [2,'Downtown Norfolk',36.847,-76.286],[2,'Rural Suffolk and Isle of Wight',36.70,-76.66],[3,'Hampton Roads Bridge-Tunnel',36.988,-76.302],[3,'Chesapeake Bay Bridge-Tunnel',37.03,-76.08],
+ [4,'Virginia Beach oceanfront',36.853,-75.978],[4,'Historic Williamsburg',37.271,-76.707],[5,'I-64 westbound evacuation route',37.18,-76.56],[5,'US 460 / US 58 westbound',36.72,-76.75]];
+
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const stage=$('#stage'),slides=$$('.slide');
+let cur=0,step=0;
+function fit(){const s=Math.min(innerWidth/1920,innerHeight/1080);stage.style.transform=`scale(${s})`}
+addEventListener('resize',fit);fit();
+slides.forEach((s,i)=>{const pn=s.querySelector('.pn');if(pn)pn.textContent=i+1});
+fillIcons(document);
+
+// generic fragments + per-slide hooks
+const HOOK={};
+function nSteps(s){return +(s.dataset.steps||0)}
+function applyStep(){const s=slides[cur];s.querySelectorAll('.frag').forEach(f=>f.classList.toggle('in',+f.dataset.f<=step));if(HOOK[s.id]&&HOOK[s.id].step)HOOK[s.id].step(step)}
+function go(i,st){i=Math.max(0,Math.min(slides.length-1,i));const changed=i!==cur;
+  if(changed){slides[cur].classList.remove('on');cur=i}
+  slides[cur].classList.add('on');step=st==null?0:st;document.getElementById('demo').classList.toggle('on',!!slides[cur].dataset.demo);applyStep();
+  if(HOOK[slides[cur].id]&&HOOK[slides[cur].id].enter&&changed)HOOK[slides[cur].id].enter();
+  $('#cnt').textContent=`${cur+1} / ${slides.length}`;$('#bar').style.width=(100*(cur+1)/slides.length)+'%';
+  history.replaceState(null,'','#'+(cur+1))}
+function next(){if(step<nSteps(slides[cur])){step++;applyStep()}else if(cur<slides.length-1)go(cur+1,0)}
+function prev(){if(step>0){step--;applyStep()}else if(cur>0){go(cur-1,nSteps(slides[cur-1]))}}
+$('#next').onclick=next;$('#prev').onclick=prev;
+$('#fs').onclick=()=>document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();
+function handleKey(k,e){
+  if($('#blank').classList.contains('on')){if(['b','B','.','Escape'].includes(k)){$('#blank').classList.remove('on')}return true}
+  if($('#overview').classList.contains('on')){if(k==='Escape'||k==='o'||k==='O')toggleOverview();return true}
+  if(['ArrowRight','PageDown',' ','Enter','ArrowDown'].includes(k)){next();return true}
+  if(['ArrowLeft','PageUp','Backspace','ArrowUp'].includes(k)){prev();return true}
+  if(k==='Home'){go(0);return true}if(k==='End'){go(slides.length-1);return true}
+  if(k==='f'||k==='F'){$('#fs').click();return true}
+  if(k==='o'||k==='O'){toggleOverview();return true}
+  if(k==='b'||k==='B'||k==='.'){$('#blank').classList.add('on');return true}
+  if(k==='h'||k==='H'){$('#demo').classList.toggle('nocap');return true}
+  if(k==='Escape'&&$('#sdet').classList.contains('on')){$('#sdet').classList.remove('on');return true}
+  return false}
+document.addEventListener('keydown',e=>{if(e.target.closest&&e.target.closest('input,select,textarea'))return;if(handleKey(e.key,e))e.preventDefault()});
+let mt=0;addEventListener('mousemove',()=>{document.body.classList.add('mouse');clearTimeout(mt);mt=setTimeout(()=>document.body.classList.remove('mouse'),2200)});
+let tx=null;addEventListener('touchstart',e=>{tx=e.touches[0].clientX},{passive:true});
+addEventListener('touchend',e=>{if(tx==null)return;const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>60&&!e.target.closest('.leaflet-container'))d<0?next():prev();tx=null});
+function toggleOverview(){const o=$('#overview');if(o.classList.toggle('on')){o.innerHTML=slides.map((s,i)=>`<button data-i="${i}" class="${i===cur?'cur':''}"><div class="thumb">${s.dataset.title}</div><div class="lbl">${i+1}. ${s.dataset.title}</div></button>`).join('');
+  o.querySelectorAll('button').forEach(b=>b.onclick=()=>{o.classList.remove('on');go(+b.dataset.i)})}}
+
+// ---------- slide 3: challenges map
+let cmap=null,cmarks=[];
+function selChallenge(c){$$('#s3 .ccard').forEach(b=>b.classList.toggle('sel',+b.dataset.c===c));
+  cmarks.forEach(m=>m.getElement()&&m.getElement().firstChild.classList.toggle('sel',m.c===c));
+  if(!cmap)return;const pts=PLACES.filter(p=>p[0]===c).map(p=>[p[2],p[3]]);
+  if(pts.length)cmap.flyToBounds(L.latLngBounds(pts).pad(.6),{maxZoom:11,duration:.8});
+  cmarks.filter(m=>m.c===c).forEach((m,k)=>{if(!k)m.openTooltip()})}
+HOOK.s3={enter(){if(cmap){cmap.invalidateSize();return}if(!window.L)return;
+  cmap=L.map('cmap',{zoomControl:false,attributionControl:true,zoomSnap:.25}).setView([36.93,-76.36],9.25);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:16,attribution:'Esri'}).addTo(cmap);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:16}).addTo(cmap);
+  PLACES.forEach(p=>{const m=L.marker([p[2],p[3]],{icon:L.divIcon({className:'',html:`<div class="cmark">${p[0]+1}</div>`,iconSize:[34,34],iconAnchor:[17,17]})}).addTo(cmap);
+    m.c=p[0];m.bindTooltip(p[1],{direction:'top',offset:[0,-16]});m.on('click',()=>selChallenge(p[0]));cmarks.push(m)})}};
+$$('#s3 .ccard').forEach(b=>b.onclick=()=>selChallenge(+b.dataset.c));
+
+// ---------- slide 4: study types
+$('#sgrid').innerHTML=STUDY.map((s,i)=>`<button class="scard" data-i="${i}"><div class="tx"><span class="ico">${icon(s[0])}</span><div><h3>${s[1]}</h3><p>${s[2]}</p></div></div><div class="im"><img src="assets/${s[3]}.jpg" alt=""></div></button>`).join('');
+let sOpen=0;function openStudy(i){sOpen=(i+STUDY.length)%STUDY.length;const s=STUDY[sOpen],d=$('#sdet');d.querySelector('img').src='assets/'+s[3]+'.jpg';
+  d.querySelector('.ico').innerHTML=icon(s[0]);d.querySelector('h2').textContent=s[1];d.querySelector('p').textContent=s[2];d.classList.remove('on');void d.offsetWidth;d.classList.add('on')}
+$$('#sgrid .scard').forEach(b=>b.onclick=()=>openStudy(+b.dataset.i));
+$('#sdet .x').onclick=()=>$('#sdet').classList.remove('on');
+$$('#sdet .nx button').forEach(b=>b.onclick=()=>openStudy(sOpen+ +b.dataset.d));
+HOOK.s4={enter(){$('#sdet').classList.remove('on')}};
+
+// ---------- slide 5: process stepper
+$('#ksteps').innerHTML=STEPS.map((s,i)=>`<button class="kstep" data-k="${i+1}" style="--c:${s[1]}"><span class="num">${i+1}</span><span class="ico">${icon(s[0])}</span><h3>${s[2]}</h3></button>`).join('');
+function showK(k){const d=$('#kdet');$$('#ksteps .kstep').forEach((b,i)=>{b.classList.toggle('cur',i+1===k);b.classList.toggle('done',k===0||i+1<=k)});
+  if(k===0){d.style.setProperty('--c','#0a1f44');d.innerHTML=`<div class="tx" style="text-align:center"><p style="font-size:34px">Seven steps take a study from a defined need to a funded, constructed improvement.</p><p class="hint" style="margin-top:14px">Press &rarr; to walk through each step, or click one.</p></div>`;return}
+  const s=STEPS[k-1];d.style.setProperty('--c',s[1]);
+  d.innerHTML=`<img src="assets/${s[4]}.jpg" alt=""><div class="tx"><div class="k">Step ${k} of 7</div><h2>${s[2]}</h2><p>${s[3]}</p><div class="pr">${STEPS.map((x,i)=>`<i class="${i<k?'on':''}"></i>`).join('')}</div></div>`;
+  d.classList.remove('anim');void d.offsetWidth;d.classList.add('anim')}
+HOOK.s5={step:showK};
+$$('#ksteps .kstep').forEach(b=>b.onclick=()=>{step=+b.dataset.k;applyStep()});
+
+// ---------- slide 7: live needs + projects map
+const VC=['#c9ced6','#2e8b2e','#f2c200','#f07d00','#d7191c'];   // VTrans web map colours: P4 green ... P1 red
+let lmap=null,lmode=0,LD=null,lsegs=null,lproj=null;
+function loadHR(){return new Promise((res,rej)=>{if(window.PRIORITY_DATA&&window.PRIORITY_DATA['Hampton Roads'])return res();window.PRIORITY_DATA=window.PRIORITY_DATA||{};
+  const s=document.createElement('script');s.src=HR_DATA;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+const dec=p=>{const a=[];for(let i=0;i<p.length;i+=2)a.push([p[i]/1e5,p[i+1]/1e5]);return a};
+function buildLive(){const D=window.PRIORITY_DATA['Hampton Roads'],rN=L.canvas({padding:.4}),rP=L.canvas({padding:.4});
+  const P=D.projects.map(p=>({p,poly:p.g.map(x=>x.map(dec))}));
+  lsegs=D.needs.filter(x=>x[3]>=1).map(x=>({di:x[3],has:x[5].some(j=>!D.projects[j].net),mi:x[9],line:L.polyline(x[0].map(dec),{renderer:rN,interactive:false,weight:1.2+x[3]*.5,color:VC[x[3]]})}));
+  lproj=P.filter(o=>!o.p.net).map(o=>L.polygon(o.poly,{renderer:rP,interactive:false,color:o.p.past?'#0b35a0':'#5b2a86',weight:1.2,fillOpacity:.35,fillColor:o.p.past?'#3c6fe0':'#9c5fd0'}));
+  LD={nproj:lproj.length,npast:P.filter(o=>!o.p.net&&o.p.past).length};
+  let hi=0,hiNo=0;lsegs.forEach(o=>{if(o.di>=3){hi+=o.mi;if(!o.has)hiNo+=o.mi}});LD.hi=hi;LD.hiNo=hiNo}
+function liveMode(m){lmode=m;$$('#s7 .mh button').forEach(b=>b.classList.toggle('on',+b.dataset.m===m));if(!lmap||!lsegs)return;
+  lmap.eachLayer(l=>{if(!(l instanceof L.TileLayer))lmap.removeLayer(l)});
+  const order=lsegs.slice().sort((a,b)=>a.di-b.di);
+  if(m===2){order.forEach(o=>{const gap=o.di>=3&&!o.has;o.line.setStyle({color:gap?VC[o.di]:'#b9c0cc',opacity:gap?1:.5,weight:gap?3.5:1});o.line.addTo(lmap)})}
+  else{order.forEach(o=>{o.line.setStyle({color:VC[o.di],opacity:.95,weight:1.2+o.di*.5});o.line.addTo(lmap)});if(m===1)lproj.forEach(p=>p.addTo(lmap))}
+  const n=v=>Math.round(v).toLocaleString();
+  $('#lleg').innerHTML=m===2?`<b>Priority 1-2 roads with no project or study</b><i style="background:${VC[4]}"></i>Priority 1<br><i style="background:${VC[3]}"></i>Priority 2<br><i style="background:#b9c0cc"></i>Covered, or lower priority`
+    :`<b>District priority</b><i style="background:${VC[4]}"></i>Priority 1<br><i style="background:${VC[3]}"></i>Priority 2<br><i style="background:${VC[2]}"></i>Priority 3<br><i style="background:${VC[1]}"></i>Priority 4`+(m===1?`<br><i style="background:#3c6fe0;height:12px"></i>Completed project / study<br><i style="background:#9c5fd0;height:12px"></i>Planned, underway or proposed`:'');
+  $('#lstats').innerHTML=m===0?`<div><b>${n(LD.hi)}</b><span>miles of Priority 1-2 roads</span></div><div><b>&mdash;</b><span>projects and studies: not on this map</span></div><div><b>&mdash;</b><span>Priority 1-2 miles with none: unknown</span></div>`
+    :`<div><b>${n(LD.hi)}</b><span>miles of Priority 1-2 roads</span></div><div><b>${n(LD.nproj)}</b><span>projects and studies mapped</span></div><div><b>${n(LD.hiNo)}</b><span>Priority 1-2 miles with none</span></div>`}
+HOOK.s7={enter(){if(lmap){lmap.invalidateSize();return}if(!window.L)return;
+  lmap=L.map('lmap',{zoomSnap:.25,preferCanvas:true}).setView([36.92,-76.33],10);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:16,attribution:'Esri'}).addTo(lmap);
+  loadHR().then(()=>{buildLive();$('#lload').remove();liveMode(Math.min(step,2))}).catch(()=>{$('#lload').innerHTML='The live map needs the <b>explorer</b> folder next to this presentation.'})},
+  step(k){liveMode(k)}};
+$$('#s7 .mh button').forEach(b=>b.onclick=()=>{step=+b.dataset.m;applyStep()});
+
+// =================== data-problem slides (real Hampton Roads records) ===================
+const EX=(window.EXAMPLES||{ex:{}}).ex, NC=['#c9ced6','#2e8b2e','#f2c200','#f07d00','#d7191c'];
+function mmap(id,dark){const m=L.map(id,{zoomControl:false,attributionControl:true,zoomSnap:.25,scrollWheelZoom:true});
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:16,maxZoom:19,attribution:'Esri'}).addTo(m);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:16,maxZoom:19}).addTo(m);return m}
+function gl(g,st,grp){if(!g)return null;const l=L.geoJSON(g,{style:()=>st,pointToLayer:(f,ll)=>L.circleMarker(ll,Object.assign({radius:9,weight:3,fillColor:'#fff',fillOpacity:1},st))});if(grp)l.addTo(grp);return l}
+function fitTo(m,layers,pad,maxZ){const b=L.latLngBounds([]);layers.filter(Boolean).forEach(l=>{const x=l.getBounds();if(x.isValid())b.extend(x)});if(!b.isValid())return;
+  if(b.getNorthEast().equals(b.getSouthWest()))m.setView(b.getCenter(),maxZ||16);else m.fitBounds(b.pad(pad==null?.25:pad),{maxZoom:maxZ||18})}
+const BLUE={color:'#0b35a0',weight:4,opacity:1},RAW={color:'#d7191c',weight:3,opacity:.95},LRSST={color:'#7d8796',weight:1.6,opacity:.8,dashArray:'4 3'};
+const leg=(el,items)=>{el.innerHTML=items.map(([c,t,h])=>`<div><i style="background:${c};height:${h||5}px"></i>${t}</div>`).join('')};
+// ---- D1 gallery
+let D1done=false;
+HOOK.d1={enter(){if(D1done||!window.L)return;D1done=true;
+  [['g1','lrs',BLUE,.6],['g2','point',{color:'#e04e1b',radius:11,weight:4},0,16],['g3','ss_thin',{color:'#0b35a0',weight:2,fillColor:'#3c6fe0',fillOpacity:.5},.15],
+   ['g4','ss_fat',{color:'#0b35a0',weight:2,fillColor:'#3c6fe0',fillOpacity:.35},.3],['g5','stars',{color:'#5b2a86',weight:3,dashArray:'6 4'},.15],['g6','p2p_point',{color:'#e04e1b',radius:11,weight:4},0,15]]
+  .forEach(([id,k,st,pad,z])=>{const m=mmap(id);const e=EX[k];if(!e)return;const l=gl(e.raw,st,m);fitTo(m,[l],pad,z)})}};
+// ---- D2 SYIP entry styles
+let d2m=null,d2g=null;
+const D2=[
+ {k:'lrs',cap:'<b>Mercury Blvd Pedestrian Improvements</b> &middot; drawn on the LRS centerline: the easy case.'},
+ {k:'lrs',cap:'<b>Mercury Blvd Pedestrian Improvements</b> &middot; 32 vertices, exactly on the LRS centerline. Most SYIP records look like this.'},
+ {k:'noroad',lrs:1,cap:'<b>#PIPELINE25 Coliseum Drive</b> &middot; the dashed grey LRS has no centerline under this 2.2-mile line, so the PM drew it by hand.'},
+ {k:'coarse',lrs:1,cap:'<b>Signal Retiming Improvements</b> &middot; a straight sketch about 200 ft from the road it describes.'},
+ {k:'wholeroute',whole:1,cap:'<b>#SGR25LP Hampton Boulevard</b> &middot; published as all of VA-337 (35.8 mi, red). One York County study was published as all 258 miles of US-17.'}];
+function d2show(k){document.querySelectorAll('#d2 .case').forEach(c=>{const n=+c.dataset.c;c.classList.toggle('cur',n===k);c.classList.toggle('done',k>0&&n<k)});
+  const S=D2[k];$('#d2cap').innerHTML=S.cap;if(!d2m)return;d2g.clearLayers();const e=EX[S.k];if(!e)return;const L_=[];
+  if(S.lrs&&e.lrs)e.lrs.forEach(g=>gl(g,LRSST,d2g));
+  if(S.whole){const r=gl(e.raw,{color:'#d7191c',weight:3},d2g);const f=gl(e.final,{color:'#0b35a0',weight:7},d2g);fitTo(d2m,[r],.05);leg($('#d2leg'),[['#d7191c','As published (whole route)'],['#0b35a0','The actual project']])}
+  else{const r=gl(e.raw,BLUE,d2g);fitTo(d2m,[r],S.k==='coarse'?.9:.35);leg($('#d2leg'),S.lrs?[['#0b35a0','SYIP line as entered'],['#7d8796','LRS centerlines']]:[['#0b35a0','SYIP line as entered']])}}
+HOOK.d2={enter(){if(!d2m&&window.L){d2m=mmap('d2map');d2g=L.layerGroup().addTo(d2m)}else if(d2m)d2m.invalidateSize();d2show(step)},step:d2show};
+// ---- D3 buffer comparison
+const BUF=[50,250,750];let b1=null,b2=null;const BG={};
+function bset(id,key,k){const e=EX[key];if(!e)return;const m=id==='b1'?b1:b2;const g=BG[id];
+  if(!m||!g){$('#'+id+'c').innerHTML=BUF.map((b,i)=>`<div class="${i+1===k?'on':''}"><b>${e.buf[b].segs.length}</b><span>segments at ${b} ft</span></div>`).join('');return}g.clearLayers();
+  (e.lrs||[]).forEach(x=>gl(x,{color:'#aab2bf',weight:1.2,opacity:.7},g));
+  const hit=k?new Set(e.buf[BUF[k-1]].segs.map(String)):new Set();
+  Object.entries(e.segs).forEach(([j,s])=>gl(s.g,hit.has(j)?{color:NC[s.di]||'#2e8b2e',weight:6,opacity:1}:{color:'#c3c9d3',weight:2.5,opacity:.9},g));
+  if(k)gl(e.buf[BUF[k-1]].poly,{color:'#e04e1b',weight:2,fillColor:'#e04e1b',fillOpacity:.12},g);
+  const r=gl(e.raw,{color:'#0b35a0',weight:4},g);
+  if(!m._fit){fitTo(m,[gl(e.buf['250'].poly,{opacity:0,fillOpacity:0})],.05);m._fit=1}
+  $('#'+id+'c').innerHTML=BUF.map((b,i)=>`<div class="${i+1===k?'on':''}"><b>${e.buf[b].segs.length}</b><span>segments at ${b} ft</span></div>`).join('')}
+const D3MSG=['Each click widens the buffer: 50 ft, then 250 ft, then 750 ft. The numbers count the VTrans need segments it captures.',
+ 'At 50 ft the fine line picks up its road and the streets it touches; the coarse sketch catches nothing at all.',
+ 'At 250 ft the coarse sketch finally reaches its road, while the fine line keeps collecting side streets.',
+ 'At 750 ft both over-reach, pulling in roads neither project touches. No single buffer works for both.'];
+function d3show(k){bset('b1','fine',k);bset('b2','coarse',k);$('#d3msg').textContent=D3MSG[k]}
+HOOK.d3={enter(){if(!b1&&window.L){b1=mmap('b1');b2=mmap('b2');BG.b1=L.layerGroup().addTo(b1);BG.b2=L.layerGroup().addTo(b2)}else if(b1){b1.invalidateSize();b2.invalidateSize()}d3show(step)},step:d3show};
+// ---- D4 uniformity method
+const U=[
+ ['Rebuild polygon outlines','STARS and SMART SCALE FY22 shapes stored as closed lines become real polygons.','stars',
+  '<b>STARS Mercury Boulevard study</b> &middot; a closed outline stored as lines (dashed) becomes one polygon (filled), like every other study area.'],
+ ['Repair whole-route lines','Rebuild the project between its from/to limits on the LRS.','wholeroute',
+  '<b>#SGR25LP Hampton Boulevard</b> &middot; published line = all of VA-337E (35.8 mi); rebuilt between its limits at measures 33.04 to 34.11: 1.06 mi.'],
+ ['Place points and placeholders','Cluster points become spots; areawide and network-wide work is kept apart.','point',
+  '<b>Elizabeth River Trail, Phase 3a</b> &middot; only a cluster point, so it becomes a 100 ft spot. 59 areawide records are listed but not drawn, and network-wide programs sit behind a toggle.'],
+ ['One uniform footprint','50 ft each side of every line and sliver; 100 ft disc for spots; real polygons kept.','ss_thin',
+  '<b>SMART SCALE FY2024 Military Highway</b> &middot; a 2-ft-wide sliver polygon (blue) gets the same 50 ft corridor (orange) as any SYIP line.'],
+ ['Match needs along the route only','A road must carry at least 30% of the project length (200 to 1,000 ft).','fine',
+  '<b>#HB2.FY17 Longhill Rd Widening</b> &middot; 26 need segments touch the corridor; cross streets fail the route test (grey), so 17 are kept (coloured by priority).'],
+ ['Record what was done','Every project keeps its method, confidence and a plain note.','wholeroute',
+  '<b>Traceable</b> &middot; GEOM_METHOD, GEOM_CONF and GEOM_NOTE travel with every record into the app and ArcGIS Online, so anyone can see what was repaired and PMs can see what to fix.']];
+$('#d4steps').innerHTML=U.map((u,i)=>`<div class="ustep" data-u="${i+1}"><span class="n">${i+1}</span><div><h3>${u[0]}</h3><p>${u[1]}</p></div></div>`).join('');
+let d4m=null,d4g=null;
+function d4show(k){document.querySelectorAll('#d4 .ustep').forEach(c=>{const n=+c.dataset.u;c.classList.toggle('cur',n===k);c.classList.toggle('done',k>0&&n<k)});
+  if(k===0){$('#d4cap').innerHTML='<b>Six steps, one run</b> &middot; every source goes through the same steps before it touches the needs layer.'}else $('#d4cap').innerHTML=U[k-1][3];
+  if(!d4m)return;d4g.clearLayers();const key=k?U[k-1][2]:'stars',e=EX[key];if(!e)return;let fit=[];
+  if(k<=1){const r=gl(e.raw,{color:'#5b2a86',weight:3,dashArray:'6 4'},d4g);if(k===1)gl(e.final,{color:'#5b2a86',weight:2,fillColor:'#9c5fd0',fillOpacity:.45},d4g);fit=[r];
+    leg($('#d4leg'),k?[['#5b2a86','Stored as lines'],['#9c5fd0','Rebuilt polygon',12]]:[['#5b2a86','Stored as lines']])}
+  else if(k===2||k===6){const r=gl(e.raw,{color:'#d7191c',weight:2.5},d4g);const f=gl(e.final,{color:'#0b35a0',weight:8},d4g);
+    if(k===6){f.bindTooltip(e.note,{permanent:true,direction:'top',className:'',offset:[0,-6]}).openTooltip();fit=[f];d4m.fitBounds(f.getBounds().pad(1.2))}else fit=[r];
+    leg($('#d4leg'),[['#d7191c','As published'],['#0b35a0','Rebuilt from limits']])}
+  else if(k===3){const f=gl(e.foot,{color:'#e04e1b',weight:2,fillColor:'#e04e1b',fillOpacity:.25},d4g);gl(e.raw,{color:'#0b35a0',radius:7,weight:3},d4g);fit=[f];leg($('#d4leg'),[['#0b35a0','Cluster point'],['#e04e1b','100 ft spot',12]])}
+  else if(k===4){const f=gl(e.foot,{color:'#e04e1b',weight:2,fillColor:'#e04e1b',fillOpacity:.2},d4g);gl(e.raw,{color:'#0b35a0',weight:3,fillColor:'#0b35a0',fillOpacity:.8},d4g);fit=[f];
+    leg($('#d4leg'),[['#0b35a0','2 ft sliver as published'],['#e04e1b','50 ft corridor',12]])}
+  else if(k===5){gl(e.corr,{color:'#e04e1b',weight:1.5,fillColor:'#e04e1b',fillOpacity:.08,dashArray:'4 3'},d4g);
+    (e.cand||[]).forEach(c=>gl(c.g,c.k?{color:NC[c.di]||'#2e8b2e',weight:6}:{color:'#8e97a5',weight:4,dashArray:'5 4'},d4g));const r=gl(e.raw,{color:'#0b35a0',weight:3},d4g);fit=[r];
+    leg($('#d4leg'),[['#0b35a0','Project line'],['#f07d00','Need kept (by priority)'],['#8e97a5','Cross street dropped']])}
+  if(k!==6)fitTo(d4m,fit,k===3?2.5:.35,k===3?17:18)}
+HOOK.d4={enter(){if(!d4m&&window.L){d4m=mmap('d4map');d4g=L.layerGroup().addTo(d4m)}else if(d4m)d4m.invalidateSize();d4show(step)},step:d4show};
+
+// =================== live demo: the clicker drives the app ===================
+const MERC=[37.04039,-76.39404],VB=[36.8448,-76.1372];
+const VBPOLY=[[36.8516,-76.1470],[36.8533,-76.1322],[36.8446,-76.1258],[36.8370,-76.1318],[36.8380,-76.1468]];
+const SC=[
+ ['The app','One map, every source','The 2025 VTrans Prioritized Mid-term Needs, coloured by Construction District priority, with SYIP, SMART SCALE, STARS, Pathways and AMP footprints on top.',
+  {view:{c:[36.92,-76.33],z:10},spot:[{sel:'.brand',label:'Built on the 2025 VTrans Prioritized Mid-term Needs',side:'right'}]}],
+ ['Priority types','Construction District priority','Pick the priority type here; the note explains how VTrans builds it.',
+  {view:{c:[36.92,-76.33],z:10},spot:[{sel:'#ptype',label:'Choose the priority type',side:'right'},{sel:'#pinfo',label:'How VTrans calculates it',side:'right'}]}],
+ ['Priority types','Statewide priority','Only Corridors of Statewide Significance and Safety needs, ranked across the Commonwealth.',
+  {metric:'sw',view:{c:[36.92,-76.33],z:10},spot:[{sel:'#pinfo',label:'Statewide: CoSS + Safety only',side:'right'}]}],
+ ['Priority types','A single need: pedestrian access','Any of the 17 VTrans need categories can colour the map, Low to Very High.',
+  {metric:'RN_PED',view:{c:[36.86,-76.27],z:12},spot:[{sel:'#ptype',label:'Pedestrian Access (RN)',side:'right'},{sel:'#legend',label:'Low to Very High',side:'right'}]}],
+ ['Priority types','Pedestrian safety','Where pedestrian crash risk is highest.',
+  {metric:'SAF_PED',view:{c:[36.86,-76.27],z:12},spot:[{sel:'#pinfo',label:'Pedestrian safety need',side:'right'}]}],
+ ['Map controls','Show only the top tiers','Click a colour in the legend to hide everything below it: here only Priority 1 and 2.',
+  {minLv:3,view:{c:[36.92,-76.33],z:10.5},spot:[{sel:'#legend',label:'Only Priority 1-2 shown',side:'right'}]}],
+ ['Map controls','Dark basemap','Basemaps come from Esri for now: light, dark and satellite.',
+  {base:'dark',view:{c:[36.92,-76.33],z:10.5},spot:[{sel:'#bseg',label:'Esri basemaps (for now)',side:'right'}]}],
+ ['Map controls','Satellite view','Imagery helps read a corridor: downtown Norfolk.',
+  {base:'sat',view:{c:[36.852,-76.287],z:15},spot:[{sel:'#bseg',label:'Satellite',side:'right'}]}],
+ ['Map controls','Projects only','Turn the priority roads off to see just the projects and studies.',
+  {roads:false,view:{c:[36.90,-76.30],z:11},spot:[{sel:'.chk',label:'Layer switches',side:'right'}]}],
+ ['Map controls','Roads only','Or the reverse: the VTrans needs without the projects.',
+  {proj:false,view:{c:[36.90,-76.30],z:11},spot:[{sel:'.chk',label:'Projects off',side:'right'}]}],
+ ['Finding gaps','Priority 1-2 roads with no project yet','The gap filter keeps only the district Priority 1-2 roads that no project or study touches. The tiles update live.',
+  {minLv:3,gap:'none',view:{c:[36.90,-76.30],z:10.5},spot:[{sel:'#gseg',label:'No project yet',side:'right'},{sel:'#tiles',label:'Miles still unaddressed',side:'right'}]}],
+ ['Finding gaps','Pedestrian-access gaps','The same filter on one need: High and Very High pedestrian-access needs with nothing planned.',
+  {metric:'RN_PED',minLv:3,gap:'none',view:{c:[36.88,-76.28],z:11},spot:[{sel:'#tiles',label:'Ped-access miles with no project',side:'right'}]}],
+ ['Projects tab','Every project and study','The Projects tab lists everything on the map, with search, filters, sorting and CSV download.',
+  {tab:'proj',view:{c:[36.92,-76.33],z:10},spot:[{sel:'#cnt',label:'Projects in the district',side:'right'}]}],
+ ['Projects tab','STARS studies','STARS studies look at safety and operations on major corridors.',
+  {tab:'proj',chips:['stars'],view:{c:[36.92,-76.33],z:10},spot:[{sel:'.fchip[data-c="stars"]',label:'STARS only',side:'right'},{sel:'#plist',label:'Completed and ongoing STARS studies',side:'right',pad:0}]}],
+ ['Projects tab','Project Pipeline','Project Pipeline studies develop solutions for VTrans needs that can go on to SMART SCALE.',
+  {tab:'proj',chips:['pipe'],view:{c:[36.92,-76.33],z:10},spot:[{sel:'.fchip[data-c="pipe"]',label:'Project Pipeline',side:'right'}]}],
+ ['Projects tab','Multimodal: bike / ped and transit','Check that multimodal needs have multimodal projects.',
+  {tab:'proj',chips:['bp','tr'],view:{c:[36.90,-76.30],z:11},spot:[{sel:'.fchip[data-c="bp"]',label:'Bike / ped + transit',side:'right'}]}],
+ ['Scenario: a locality asks','"Could we add pedestrian improvements on Mercury Blvd?"','The City of Hampton asks about Mercury Boulevard. Turn on the Circle tool.',
+  {circleTool:true,view:{c:MERC,z:15},spot:[{sel:'#circbtn',label:'Circle tool on',side:'right'}]}],
+ ['Scenario: a locality asks','Everything within half a mile','One click: priorities, every VTrans need and every project within the circle.',
+  {circleTool:true,view:{c:MERC,z:14.5},action:{type:'circle',at:MERC,r:0.5},spot:[{sel:'#right',label:'Priorities and needs in the circle',side:'left',pad:0}]}],
+ ['Scenario: a locality asks','The work already done here','A completed STARS study (also in Pathways) and completed sidewalks: data, outreach and early engineering already exist.',
+  {circleTool:true,view:{c:MERC,z:14.5},action:{type:'circle',at:MERC,r:0.5},scroll:'#rbody .h-past',spot:[{sel:'#rbody .h-past',label:'Past projects and studies',side:'left',pad:2}]}],
+ ['Scenario: a locality asks','Open the STARS study','Which needs it covered, its status, and the matched roads outlined on the map.',
+  {circleTool:true,view:{c:MERC,z:14},action:{type:'project',id:'STARS-STARS3.1-HR-02',from:MERC,r:0.5,zoom:true},scroll:'#rbody .h-needs',spot:[{sel:'#rbody .h-needs',label:'Needs the study addressed',side:'left',pad:2}]}],
+ ['Scenario: a locality asks','Circle off','Switch the circle off and the map is back to normal clicking.',
+  {circleTool:false,view:{c:MERC,z:14},spot:[{sel:'#circbtn',label:'Circle tool off',side:'right'}]}],
+ ['Scenario: a new idea','Virginia Beach has a project idea','Around Independence Blvd and Virginia Beach Blvd, where some Priority 1-2 roads have no project yet. Use Draw area.',
+  {minLv:1,view:{c:VB,z:15},spot:[{sel:'#drawbtn',label:'Draw area',side:'right'}]}],
+ ['Scenario: a new idea','Draw the idea','Every VTrans need inside the shape: what the project should focus on.',
+  {view:{c:VB,z:15},action:{type:'draw',poly:VBPOLY},spot:[{sel:'#rbody .h-needs',label:'Needs the project should target',side:'left',pad:2}],spotDelay:300}],
+ ['Scenario: a new idea','Build on what is already here','A completed STARS study on Independence Blvd and four active projects sit inside the area: the idea can build on them instead of duplicating them.',
+  {view:{c:VB,z:15},action:{type:'draw',poly:VBPOLY},scroll:'#rbody .h-past',spot:[{sel:'#rbody .h-past',label:'Past and planned projects here',side:'left',pad:2}],spotDelay:300}],
+ ['More uses','The whole state','The same view statewide: Priority 1-2 roads with no project, across all nine districts.',
+  {district:'Statewide',minLv:3,gap:'none',view:{c:[37.6,-78.7],z:7.25},spot:[{sel:'#tiles',label:'Statewide gaps',side:'right'},{sel:'#dist',label:'Any district or the whole state',side:'right'}]}],
+ ['More uses','Look up any project','Search by name, project ID or UPC.',
+  {district:'Hampton Roads',tab:'proj',q:'mercury',view:{c:[37.03,-76.38],z:13},spot:[{sel:'#q',label:'Name, ID or UPC',side:'right'}]}],
+ ['More uses','Network-wide programs','Citywide and districtwide programs stay out of the road counts but are one click away.',
+  {district:'Hampton Roads',tab:'proj',net:'only',view:{c:[36.92,-76.33],z:9.5},spot:[{sel:'#nseg',label:'Isolate network-wide work',side:'right'}]}],
+ ['More uses','Take it to the meeting','Any filtered list downloads as a spreadsheet.',
+  {district:'Hampton Roads',tab:'proj',chips:['stars'],view:{c:[36.92,-76.33],z:10},spot:[{sel:'#csv',label:'Download CSV',side:'right'}]}]];
+const demoEl=$('#demo'),demoF=$('#demof');let peLoaded=false,pendingScene=null;
+function demoSrc(){if(!demoF.getAttribute('src'))demoF.src=EXPLORER}
+function sendScene(k){const s=SC[k];if(!s)return;$('#dcap .ch').textContent=s[0];$('#dcap h4').textContent=s[1];$('#dcap p').textContent=s[2];$('#dcap .ctl span').textContent=`${k+1} / ${SC.length}`;
+  if(!peLoaded){pendingScene=k;return}demoF.contentWindow.postMessage({type:'pe-scene',scene:s[3]},'*')}
+addEventListener('message',e=>{const m=e.data||{};if(m.type==='pe-loaded'){peLoaded=true;if(pendingScene!=null){const k=pendingScene;pendingScene=null;sendScene(k)}}
+  if(m.type==='pe-key')handleKey(m.key)});
+$('#demo-s').dataset.steps=SC.length-1;
+HOOK['demo-s']={enter(){demoSrc();demoEl.classList.add('on')},step(k){sendScene(k)}};
+HOOK.s8={enter(){demoSrc()}};
+$('#dprev').onclick=()=>prev();$('#dnext').onclick=()=>next();
+
+$('#godemo').onclick=()=>next();
+// start
+const h=parseInt(location.hash.slice(1));go(h>0?h-1:0);slides[cur].classList.add('on');if(HOOK[slides[cur].id]&&HOOK[slides[cur].id].enter)HOOK[slides[cur].id].enter();
+</script></body></html>
